@@ -39,8 +39,10 @@ Config: `tauri.conf.json` (frameless, 1180×760, min 960×620, `bundle.active=fa
 - Dev: `npx tauri dev`. Release exe: `npx tauri build --no-bundle` → `src-tauri/target/release/Hermes.exe`.
 - **Testing (mandatory after every change):** build release, then `node scripts/smoke.mjs`.
   It launches the real exe with WebView2 DevTools on port 9333 and drives it with playwright-core.
-  Feature tests import `{ launch, check, OUT }` from `scripts/smoke.mjs`; screenshots go to `test-output/`.
-  Extend the smoke test for every new feature.
+  Feature tests import `{ launch, connect, check, OUT }` from `scripts/smoke.mjs` (`connect(port)` attaches to an
+  already running instance); screenshots go to `test-output/`. Extend the smoke test for every new feature.
+- Self-update E2E: `node scripts/update-test.mjs <dir with older Hermes.exe> <published version>` — real GitHub
+  download, swap, relaunch, cleanup. Run after touching `update.rs`/`update.ts`.
 - Release: `node scripts/release.mjs X.Y.Z` (bumps tauri.conf.json + package.json, commits, tags, pushes).
   `.github/workflows/release.yml` builds on the tag and publishes `Hermes.exe` to the Release; the tag must match the version.
 

@@ -1,4 +1,4 @@
-# Tag vX.Y.Z (use scripts/release.mjs) -> builds Hermes.exe -> GitHub Release the app self-updates from.
+﻿# Tag vX.Y.Z (use scripts/release.mjs) -> builds Hermes.exe -> GitHub Release the app self-updates from.
 name: Release
 on:
   push:
@@ -9,8 +9,8 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm

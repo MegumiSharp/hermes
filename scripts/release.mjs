@@ -14,5 +14,5 @@ for (const f of ["src-tauri/tauri.conf.json", "package.json"]) {
 }
 const run = (c) => execSync(c, { stdio: "inherit" });
 run(`git commit -am "Release v${v}"`);
-run(`git tag v${v}`);
+run(`git tag -a v${v} -m "Hermes v${v}"`); // annotated, so --follow-tags pushes it
 run("git push --follow-tags");

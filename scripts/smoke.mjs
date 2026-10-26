@@ -16,20 +16,27 @@ export async function launch(exe = DEFAULT_EXE, port = 9333) {
     env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}` },
     stdio: "ignore",
   });
+  const { browser, page, errors } = await connect(port);
+  const close = async () => { await browser.close().catch(() => {}); proc.kill(); };
+  return { page, proc, errors, close, dataDir: join(dirname(exe), "hermes-data") };
+}
+
+/** Attaches to an already running Hermes (e.g. one relaunched by the updater). */
+export async function connect(port = 9333) {
   const endpoint = `http://127.0.0.1:${port}`;
-  for (let i = 0; ; i++) {
-    try { await fetch(`${endpoint}/json/version`); break; }
-    catch { if (i > 60) throw new Error("DevTools port never opened"); await new Promise((r) => setTimeout(r, 250)); }
+  let browser;
+  for (let i = 0; !browser; i++) {
+    // retry the whole attach: a previous WebView2 may still hold the port while it shuts down
+    try { await fetch(`${endpoint}/json/version`); browser = await chromium.connectOverCDP(endpoint); }
+    catch { if (i > 80) throw new Error("DevTools port never opened"); await new Promise((r) => setTimeout(r, 250)); }
   }
-  const browser = await chromium.connectOverCDP(endpoint);
   let page;
   while (!(page = browser.contexts()[0]?.pages()[0])) await new Promise((r) => setTimeout(r, 100));
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   await page.waitForSelector(".nav");
-  const close = async () => { await browser.close().catch(() => {}); proc.kill(); };
-  return { page, proc, errors, close, dataDir: join(dirname(exe), "hermes-data") };
+  return { browser, page, errors };
 }
 
 export function check(cond, msg) {
