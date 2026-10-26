@@ -56,11 +56,31 @@ pub fn bin_dir() -> PathBuf {
     dir
 }
 
-/// Hidden async command for a bundled tool, e.g. `command("yt-dlp.exe")`.
+/// Hidden async command for a bundled tool, e.g. `command("yt-dlp.exe")`. The bin dir is put first
+/// on PATH so tools find each other (yt-dlp and gallery-dl call ffmpeg).
 pub fn command(file: &str) -> tokio::process::Command {
     let mut c = tokio::process::Command::new(bin_dir().join(file));
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    let mut dirs = vec![bin_dir()];
+    dirs.extend(std::env::split_paths(&path));
+    c.env("PATH", std::env::join_paths(dirs).unwrap_or(path));
+    c.env("PYTHONIOENCODING", "utf-8"); // non-ASCII titles/paths in tool output
     c.creation_flags(NO_WINDOW);
     c
+}
+
+/// Runs a bundled tool that prints JSON (`yt-dlp -J`, `gallery-dl -j`) and returns it parsed.
+/// On failure the error is the tool's last `ERROR:` line (or its last stderr line).
+#[tauri::command]
+pub async fn tool_json(bin: String, args: Vec<String>) -> Result<serde_json::Value, String> {
+    let out = command(&bin).args(&args).stdin(std::process::Stdio::null()).output().await.map_err(err)?;
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    if !out.status.success() {
+        let lines: Vec<&str> = stderr.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
+        let e = lines.iter().rev().find_map(|l| l.strip_prefix("ERROR: ")).or(lines.last().copied());
+        return Err(e.unwrap_or("The tool failed without a message").to_string());
+    }
+    serde_json::from_slice(&out.stdout).map_err(|e| format!("Unreadable tool output: {e}"))
 }
 
 fn tool(id: &str) -> Result<&'static Tool, String> {

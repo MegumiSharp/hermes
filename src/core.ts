@@ -20,13 +20,19 @@ export function h(html: string): HTMLElement {
   return t.content.firstElementChild as HTMLElement;
 }
 
-type Action = { label: string; primary?: boolean; run?: () => void };
+/** `run` may be async; returning `false` keeps the banner/modal open. */
+type Action = { label: string; primary?: boolean; run?: () => unknown };
 
 function buttons(actions: Action[], close: () => void) {
   return actions.map((a) => {
-    const b = h(`<button class="btn sm ${a.primary ? "primary" : "ghost"}"></button>`);
+    const b = h(`<button class="btn sm ${a.primary ? "primary" : "ghost"}"></button>`) as HTMLButtonElement;
     b.textContent = a.label;
-    b.onclick = () => { a.run?.(); close(); };
+    b.onclick = async () => {
+      b.disabled = true;
+      const keep = (await a.run?.()) === false;
+      b.disabled = false;
+      if (!keep) close();
+    };
     return b;
   });
 }
@@ -43,11 +49,16 @@ export function banner(o: { id: string; text: string; icon?: IconName; tone?: "a
 }
 
 // ---------- modals ----------
-export function modal(o: { title: string; body: string | HTMLElement; actions?: Action[] }) {
+export function modal(o: { title: string; body: string | HTMLElement; actions?: Action[]; onClose?: () => void }) {
   const el = h(`<div class="overlay"><div class="modal" role="dialog" aria-modal="true">
     <div class="m-head"><h3></h3><button class="btn sm ghost" aria-label="Close">${icon("x")}</button></div>
     <div class="m-body"></div><div class="m-foot"></div></div></div>`);
-  const close = () => { el.remove(); document.removeEventListener("keydown", esc); };
+  const close = () => {
+    if (!el.isConnected) return;
+    el.remove();
+    document.removeEventListener("keydown", esc);
+    o.onClose?.();
+  };
   const esc = (e: KeyboardEvent) => e.key === "Escape" && close();
   el.querySelector("h3")!.textContent = o.title;
   el.querySelector(".m-head button")!.addEventListener("click", close);

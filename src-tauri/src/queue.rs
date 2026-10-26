@@ -45,6 +45,8 @@ pub enum Parser {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Step {
     /// Run a bundled tool (file name in hermes-data/bin). `outputs` are files it is known to create.
+    /// `args`/`outputs` may use `{last}` / `{last_noext}` (previous output file). `replace`: on
+    /// success this step's outputs supersede the earlier ones, which are deleted from disk.
     #[serde(rename_all = "camelCase")]
     Run {
         label: String,
@@ -55,6 +57,8 @@ pub enum Step {
         outputs: Vec<String>,
         #[serde(default)]
         duration: f64,
+        #[serde(default)]
+        replace: bool,
     },
     /// Import every output so far into Eagle, then delete it from disk.
     Eagle,
@@ -268,8 +272,14 @@ async fn run(id: String) {
             });
             return;
         };
+        let mut replace_outputs = false;
         let result = match step {
-            Step::Run { label, bin, args, parser, outputs, duration } => {
+            Step::Run { label, bin, args, parser, outputs, duration, replace } => {
+                replace_outputs = replace;
+                let last = job.outputs.last().cloned().unwrap_or_default();
+                let fill = |s: &String| fill_placeholders(s, &last);
+                let args: Vec<String> = args.iter().map(fill).collect();
+                let outputs: Vec<String> = outputs.iter().map(fill).collect();
                 run_tool(&id, &label, &bin, &args, parser, duration).await.map(|mut found| {
                     found.extend(outputs);
                     found
@@ -282,6 +292,11 @@ async fn run(id: String) {
             let Some(j) = job_mut(q, &id) else { return false };
             match result {
                 Ok(found) => {
+                    if replace_outputs {
+                        // e.g. converted mp4 supersedes the downloaded mkv
+                        j.outputs.iter().filter(|o| !found.contains(o)).for_each(|o| drop(std::fs::remove_file(o)));
+                        j.outputs.clear();
+                    }
                     j.outputs.extend(found);
                     j.in_eagle |= matches!(j.steps[j.step], Step::Eagle);
                     j.step += 1;
@@ -307,6 +322,12 @@ async fn run(id: String) {
             return;
         }
     }
+}
+
+/// `{last}` = previous step's last output file, `{last_noext}` = same without extension.
+fn fill_placeholders(s: &str, last: &str) -> String {
+    let noext = std::path::Path::new(last).with_extension("");
+    s.replace("{last_noext}", &noext.to_string_lossy()).replace("{last}", last)
 }
 
 fn tick(id: &str, progress: f64, detail: String) {
@@ -343,8 +364,9 @@ async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], parser: Par
     if let Some(pid) = child.id() {
         PIDS.lock().unwrap().insert(id.into(), pid);
     }
-    let mut out = BufReader::new(child.stdout.take().unwrap()).lines();
-    let mut err = BufReader::new(child.stderr.take().unwrap()).lines();
+    // split on bytes + lossy decode: one non-UTF-8 line must not end the read loop
+    let mut out = BufReader::new(child.stdout.take().unwrap()).split(b'\n');
+    let mut err = BufReader::new(child.stderr.take().unwrap()).split(b'\n');
     let (mut out_done, mut err_done) = (false, false);
     let mut files = vec![];
     let mut error_line = String::new(); // last "ERROR: ..." line
@@ -355,10 +377,11 @@ async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], parser: Par
 
     while !(out_done && err_done) {
         let line = tokio::select! {
-            l = out.next_line(), if !out_done => l.ok().flatten().or_else(|| { out_done = true; None }),
-            l = err.next_line(), if !err_done => l.ok().flatten().or_else(|| { err_done = true; None }),
+            l = out.next_segment(), if !out_done => l.ok().flatten().or_else(|| { out_done = true; None }),
+            l = err.next_segment(), if !err_done => l.ok().flatten().or_else(|| { err_done = true; None }),
         };
         let Some(line) = line else { continue };
+        let line = String::from_utf8_lossy(&line);
         let line = line.trim();
         if let Some(f) = line.strip_prefix("[file] ") {
             files.push(f.to_string());

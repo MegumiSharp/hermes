@@ -6,7 +6,7 @@ import { banner, h } from "./core";
 import { icon, IconName } from "./icons";
 
 export type Step =
-  | { type: "run"; label: string; bin: string; args: string[]; parser: "ytDlp" | "ffmpeg" | "plain"; outputs?: string[]; duration?: number }
+  | { type: "run"; label: string; bin: string; args: string[]; parser: "ytDlp" | "ffmpeg" | "plain"; outputs?: string[]; duration?: number; replace?: boolean }
   | { type: "eagle" };
 export type EagleMeta = { website?: string; tags?: string[]; annotation?: string };
 export type NewJob = { module: string; title: string; pill?: string; steps?: Step[]; eagle?: EagleMeta; children?: NewJob[] };

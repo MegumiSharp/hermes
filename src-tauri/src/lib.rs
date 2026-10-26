@@ -1,4 +1,5 @@
 mod binaries;
+mod cookies;
 mod eagle;
 mod net;
 mod queue;
@@ -66,6 +67,7 @@ pub fn run() {
     update::cleanup_old_exe();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             queue::start(app.handle().clone());
             Ok(())
@@ -79,6 +81,10 @@ pub fn run() {
             binaries::binaries_init,
             binaries::binaries_latest,
             binaries::binary_update,
+            binaries::tool_json,
+            cookies::detect_browsers,
+            cookies::cookies_write,
+            cookies::cookies_path,
             eagle::eagle_status,
             queue::queue_get,
             queue::queue_add,

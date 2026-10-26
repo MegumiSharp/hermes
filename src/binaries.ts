@@ -63,6 +63,12 @@ export const binariesReady: Promise<void> = (async () => {
   rerender();
 })();
 
+/** Current status of one tool (after startup verification). */
+export async function toolStatus(id: string): Promise<Status | undefined> {
+  await binariesReady;
+  return statuses.find((s) => s.id === id);
+}
+
 /** Startup: auto-update yt-dlp if enabled, then announce other updates. Network errors are silent. */
 export async function startBinaryChecks() {
   await binariesReady;
