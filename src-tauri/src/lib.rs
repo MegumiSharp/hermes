@@ -1,3 +1,5 @@
+mod update;
+
 use serde_json::Value;
 use std::{fs, path::PathBuf};
 
@@ -34,9 +36,16 @@ fn save_settings(settings: Value) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    update::cleanup_old_exe();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![data_path, load_settings, save_settings])
+        .invoke_handler(tauri::generate_handler![
+            data_path,
+            load_settings,
+            save_settings,
+            update::check_update,
+            update::install_update
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -1,0 +1,31 @@
+# Tag vX.Y.Z (use scripts/release.mjs) -> builds Hermes.exe -> GitHub Release the app self-updates from.
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Tag must match app version
+        shell: bash
+        run: |
+          v=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME != tauri.conf.json version $v"; exit 1; }
+      - run: npm ci
+      - run: npx tauri build --no-bundle
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create $env:GITHUB_REF_NAME src-tauri/target/release/Hermes.exe --title "Hermes $env:GITHUB_REF_NAME" --generate-notes

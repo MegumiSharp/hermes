@@ -69,6 +69,12 @@ svg.i { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-widt
 .banner.warn > svg { color: var(--danger); }
 .banner .acts { margin-left: auto; display: flex; gap: 6px; }
 
+.btn:disabled { opacity: .5; cursor: default; }
+
+.bar { height: 4px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: inherit; transition: width .15s; }
+.progress { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
+
 .empty { margin: auto; text-align: center; color: var(--muted); }
 .empty svg { width: 28px; height: 28px; stroke-width: 1.5; }
 .empty h3 { color: var(--text); font-size: 15px; font-weight: 600; margin: 10px 0 4px; }

@@ -6,6 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { icon, IconName } from "./icons";
 import { h, settings, saveSettings } from "./core";
+import { checkForUpdate, startUpdateChecks } from "./update";
 
 type Module = {
   id: string;
@@ -36,10 +37,24 @@ async function renderSettings(view: HTMLElement) {
   const el = h(`<div class="page">
     <div class="head"><h3>Settings</h3></div>
     <div class="card"><div class="row"><div><div class="k">Version</div><div class="v mono">Hermes ${version}</div></div></div>
-    <div class="row"><div><div class="k">Data folder</div><div class="v mono"></div></div><button class="btn sm">${icon("folder")}Open</button></div></div>
+    <div class="row"><div><div class="k">Data folder</div><div class="v mono" id="data-path"></div></div><button class="btn sm" id="open-data">${icon("folder")}Open</button></div>
+    <div class="row"><div><div class="k">Updates</div><div class="v" id="update-status">Checked automatically on launch and every 6 hours</div></div><button class="btn sm" id="check-update">${icon("refresh")}Check now</button></div></div>
   </div>`);
-  el.querySelector(".row:nth-child(2) .v")!.textContent = path;
-  el.querySelector("button")!.onclick = () => revealItemInDir(path);
+  el.querySelector("#data-path")!.textContent = path;
+  (el.querySelector("#open-data") as HTMLElement).onclick = () => revealItemInDir(path);
+  const status = el.querySelector("#update-status")!;
+  const btn = el.querySelector("#check-update") as HTMLButtonElement;
+  btn.onclick = async () => {
+    btn.disabled = true;
+    status.textContent = "Checking";
+    try {
+      const u = await checkForUpdate();
+      status.textContent = u ? `Hermes ${u.version} is available` : "You are on the latest version";
+    } catch (e) {
+      status.textContent = `Check failed: ${e}`;
+    }
+    btn.disabled = false;
+  };
   view.append(el);
 }
 
@@ -78,3 +93,4 @@ wc("wc-max", "square", () => win.toggleMaximize());
 wc("wc-close", "x", () => win.close());
 
 open(settings.lastModule);
+startUpdateChecks();

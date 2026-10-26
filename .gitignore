@@ -25,3 +25,4 @@ dist-ssr
 
 # Hermes runtime data (settings, cookies, binaries) — never commit
 hermes-data/
+test-output/
