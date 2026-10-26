@@ -97,7 +97,7 @@ await page.click('.tab[data-mode="compare"]');
 await drop(page, "#r-drop-compare", photo);
 await until(() => page.$("#r-compare .tcard"), "compare image");
 await page.click("#r-go");
-await until(() => page.$(".activity .act"), "compare listed in the sidebar activity", 10000);
+await until(() => page.$(".nav-badge.busy"), "compare shown as busy on Downloads", 10000);
 check(true, "running compare appears in the sidebar");
 await page.click('.nav[data-id="video"]');
 await sleep(500);

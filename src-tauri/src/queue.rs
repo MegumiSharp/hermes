@@ -25,7 +25,7 @@ pub enum State {
 }
 
 /// How a step's console output is read.
-#[derive(Serialize, Deserialize, Clone, Copy)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum Parser {
     /// yt-dlp with `--newline --progress-template "download:[hermes] %(progress.downloaded_bytes)s
@@ -41,6 +41,8 @@ pub enum Parser {
     GalleryDl,
     /// Tools printing "42.50%" / "42,50%" lines (Real-ESRGAN).
     Percent,
+    /// spotDL: counts finished songs ("Downloaded …" / "Skipping …"); `duration` = number of songs.
+    SpotDl,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -126,30 +128,25 @@ pub struct Job {
     /// Short extra info shown when done (e.g. the device a model ran on).
     #[serde(default)]
     note: String,
-    /// Per-file log of multi-file tools (gallery-dl): what downloaded and what the server refused.
+    /// Console output of the job's tools (what is downloading, warnings, server errors), like a terminal.
     #[serde(default)]
-    items: Vec<FileLog>,
+    log: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct FileLog {
-    name: String,
-    ok: bool,
-    #[serde(default)]
-    error: String,
-}
+const LOG_LINES: usize = 400;
 
-/// Records one file of a multi-file step (kept in memory, persisted with the next state change).
-fn log_file(id: &str, entry: FileLog) {
+/// Appends a console line (kept in memory, persisted with the next state change) and streams it to the UI.
+fn log_line(id: &str, line: &str) {
     let mut q = lock();
     if let Some(j) = job_mut(&mut q, id) {
-        if j.items.len() < 2000 {
-            j.items.push(entry.clone());
+        if j.log.len() >= LOG_LINES {
+            j.log.drain(..j.log.len() + 1 - LOG_LINES);
         }
+        j.log.push(line.to_string());
     }
     drop(q);
     if let Some(app) = APP.get() {
-        app.emit("job-item", serde_json::json!({ "id": id, "item": entry })).ok();
+        app.emit("job-log", serde_json::json!({ "id": id, "line": line })).ok();
     }
 }
 
@@ -269,7 +266,7 @@ pub fn start(app: AppHandle) {
 /// Only writes when something starts: `with` wakes the scheduler, so writing on every tick would spin.
 fn pick() -> Vec<String> {
     let now = now_ms();
-    let max = setting("maxConcurrent").as_i64().unwrap_or(3).clamp(1, 5) as usize;
+    let max = setting("maxConcurrent").as_i64().unwrap_or(6).clamp(1, 10) as usize;
     let mut next = NEXT_IN_GROUP.lock().unwrap();
     let ids: Vec<(String, Option<String>)> = {
         let q = lock();
@@ -364,12 +361,14 @@ async fn run(id: String) {
             }
             Step::Rembg { model, input, output, background, crop } => {
                 tick(&id, 0.0, "Removing background".into());
+                log_line(&id, &format!("> Removing background: model {model}, {input}"));
                 crate::rembg::remove(&model, &input, &output, &background, crop)
                     .await
                     .map(|device| {
                         if let Some(j) = job_mut(&mut lock(), &id) {
                             j.note = device.to_string();
                         }
+                        log_line(&id, &format!("Done on {device}: {output}"));
                         vec![output]
                     })
                     .map_err(Stop::Failed)
@@ -401,7 +400,7 @@ async fn run(id: String) {
             }
             j.detail.clear();
             if rate_limited {
-                q.backoff_min = if q.backoff_min == 0 { 5 } else { (q.backoff_min * 2).min(60) };
+                q.backoff_min = if q.backoff_min == 0 { 1 } else { (q.backoff_min * 2).min(15) }; // 1, 2, 4, 8, 15 min
                 q.paused_until = now_ms() + q.backoff_min * 60_000;
             }
             false
@@ -504,8 +503,8 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
     let mut rate_limited = false;
     let mut last_tick = 0;
     let mut count = 0u32; // GalleryDl files seen
-    let mut last_warning = String::new(); // server reason for the next "Failed to download"
     tick(id, 0.0, label.into());
+    log_line(id, &format!("> {label}: {bin} {}", args.join(" ")));
 
     while !(out_done && err_done) {
         let line = tokio::select! {
@@ -523,17 +522,21 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
         if ["http error 429", "429 too many requests", "sign in to confirm you", "rate-limit", "rate limit"].iter().any(|s| lower.contains(s)) {
             rate_limited = true;
         }
+        // console log: everything except progress-bar noise (template ticks, ffmpeg key=value, bare %)
+        let noise = line.is_empty()
+            || line.starts_with("[hermes]")
+            || (parser == Parser::Ffmpeg && line.contains('=') && !line.contains(' '))
+            || (parser == Parser::Percent && percent(line).is_some() && line.len() < 120 && !line.contains(':'));
+        if !noise {
+            log_line(id, line);
+        }
         if let Some(e) = line.strip_prefix("ERROR: ") {
             error_line = e.to_string();
         } else if let Some((_, e)) = line.split_once("][error] ") {
             error_line = e.to_string(); // gallery-dl: "[download][error] Failed to download ..."
-            if let (Parser::GalleryDl, Some(name)) = (parser, e.strip_prefix("Failed to download ")) {
+            if parser == Parser::GalleryDl && e.starts_with("Failed to download ") {
                 count += 1;
-                log_file(id, FileLog { name: name.into(), ok: false, error: std::mem::take(&mut last_warning) });
             }
-        } else if let Some((_, w)) = line.split_once("][warning] ") {
-            // gallery-dl: "[downloader.http][warning] '429 Too many requests (…)' for 'https://…'"
-            last_warning = w.split(" for '").next().unwrap_or(w).trim_matches('\'').to_string();
         } else if !line.is_empty() && !line.starts_with("[hermes]") && !line.contains('=') {
             last_line = line.to_string();
         }
@@ -565,13 +568,18 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
                 }
                 is_path.then(|| {
                     let name = std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-                    log_file(id, FileLog { name: name.clone(), ok: true, error: if skipped.is_some() { "already downloaded".into() } else { String::new() } });
                     count += 1;
                     let total = duration.max(count as f64);
                     (count as f64 / total, format!("{label} {count} / {total:.0} · {name}"))
                 })
             }
             Parser::Percent => percent(line).map(|p| (p / 100.0, format!("{label} {p:.0}%"))),
+            Parser::SpotDl => (line.starts_with("Downloaded ") || line.starts_with("Skipping ")).then(|| {
+                count += 1;
+                let total = duration.max(count as f64);
+                let song = line.split('"').nth(1).unwrap_or_default();
+                (count as f64 / total, format!("{label} {count} / {total:.0} · {song}"))
+            }),
         };
         if let Some((pct, detail)) = update {
             if now_ms() - last_tick > 200 {
@@ -608,6 +616,7 @@ async fn eagle_step(job: &Job, keep: bool) -> Result<(), Stop> {
     }
     for (i, f) in files.iter().enumerate() {
         tick(&job.id, i as f64 / files.len() as f64, "Importing to Eagle".into());
+        log_line(&job.id, &format!("Eagle: importing {}", f.display()));
         eagle::add(f, &job.eagle).await.map_err(Stop::Failed)?;
         if !keep {
             std::fs::remove_file(f).ok();
@@ -647,7 +656,7 @@ pub fn queue_add(jobs: Vec<NewJob>) -> Vec<String> {
             in_eagle: false,
             source: n.source,
             note: String::new(),
-            items: vec![],
+            log: vec![],
         });
         for c in n.children {
             make(c, Some(id.clone()), out);
@@ -718,6 +727,17 @@ pub fn queue_clear_finished() {
         q.jobs.retain(|j| j.state != State::Done || j.group);
         let parents: Vec<String> = q.jobs.iter().filter_map(|j| j.parent.clone()).collect();
         q.jobs.retain(|j| !j.group || parents.contains(&j.id));
+    });
+}
+
+/// The tool's "Clear" button: removes all of a module's jobs that aren't running right now.
+#[tauri::command]
+pub fn queue_clear_module(module: String) {
+    with(|q| {
+        let gone: Vec<String> = q.jobs.iter().filter(|j| j.module == module && j.state != State::Running).map(|j| j.id.clone()).collect();
+        // a group stays while one of its children is still running
+        let busy: Vec<String> = q.jobs.iter().filter(|j| j.state == State::Running).filter_map(|j| j.parent.clone()).collect();
+        q.jobs.retain(|j| !gone.contains(&j.id) || busy.contains(&j.id));
     });
 }
 

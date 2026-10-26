@@ -90,6 +90,20 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] Gallery: elenco testuale di default (titolo/nome, tipo, risoluzione, data), "Show previews" per le miniature, filtri **Title contains / excludes**.
 - [ ] Gallery durante il download: in coda clic su "N files" → elenco file per file con ✓/✗ e motivo del server (es. 429, 403).
 
+## 11. Novità (giro 2)
+- [ ] **Downloads** nella sidebar (al posto di Activity): tutti i download e lavori di tutti i tool, con il nome del tool; il numerino sulla voce indica quanti sono in corso.
+- [ ] In ogni coda clicca la freccia di un elemento: si apre la **console** dal vivo (comando, file scaricati, avvisi, errori del server in rosso).
+- [ ] Avvia qualcosa, cambia tool e torna: la barra di progresso è visibile subito.
+- [ ] Pulsante **Clear** in alto in ogni tool: svuota coda (tranne ciò che sta girando) e immagini/file.
+- [ ] Settings → **Downloads at the same time** (default 6). Pausa dopo un blocco del sito: 1 min, poi 2, 4, 8, max 15. Il timer appare solo se qualcosa sta aspettando.
+- [ ] Compare models: il PC non dovrebbe più rallentare (tool a priorità bassa, metà dei core). Dimmi se lo senti ancora.
+- [ ] Background Removal / Image Upscale: i risultati sono **sempre** nella cartella scelta (con Eagle ne arriva anche una copia in Eagle).
+- [ ] Video Downloader: Best / 2160p / 1440p / 1080p (quelle non disponibili sono grigie), sotto c'è scritto **in che formato** viene salvato; spunta **Convert to MP4 for Premiere**.
+- [ ] Link di un **Mix** YouTube (`&list=RD…`): compare la spunta per scaricare tutto il Mix (max 50) invece della sola canzone. Stessa cosa per i video dentro una playlist.
+- [ ] **Spotify** (sotto Video Downloader): incolla un link di brano/album/playlist → elenco brani → Download.
+- [ ] **Video Converter**: converti in MP4/H.265/ProRes/WebM/GIF/MP3/WAV, cambia risoluzione (anche ingrandire a 1080p/4K), fps e qualità.
+- [ ] Gallery: con "Show previews" spento non compare nessun elenco, solo il riepilogo; il dettaglio file per file è nella console dell'elemento in coda.
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.

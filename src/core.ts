@@ -35,6 +35,10 @@ export function memory<T extends object>(key: string, defaults: T): { state: T; 
   return { state, save: (soon) => (soon ? saveSettingsSoon : saveSettings)({ [key]: state }) };
 }
 
+/** What each tool's "Clear" button resets besides its queue (trays, results, URLs). Tools register
+ *  this when they render; main.ts calls it, then re-renders the tool. */
+export const clearers = new Map<string, () => void>();
+
 /** Switches the sidebar module (main.ts listens), usable from banners without importing main. */
 export const navigate = (id: string) => window.dispatchEvent(new CustomEvent("hermes:open", { detail: id }));
 

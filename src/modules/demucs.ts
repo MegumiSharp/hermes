@@ -1,5 +1,5 @@
 // Stem separation module (SPEC 12): Demucs on the portable AI runtime.
-import { memory, h } from "../core";
+import { clearers, h, memory } from "../core";
 import { icon } from "../icons";
 import { addJobs, mountQueue, NewJob, Step } from "../queue";
 import { confirmModelDownload, runtimeNotice, runtimeReady } from "./ai";
@@ -19,6 +19,7 @@ export function renderDemucs(view: HTMLElement) {
     folder: "", eagle: false, model: "htdemucs", twoStems: false, format: "wav" as Format, files: [] as string[], tray: [] as TrayItem[], usedModels: [] as string[],
   });
   if (state.files.length) { state.tray = state.files.map((path) => ({ path })); state.files = []; } // pre-T12 shape
+  clearers.set("demucs", () => { state.tray = []; save(); });
 
   const page = h(`<div class="page demucs">
     <div class="head"><div><h3>Stem Separation</h3><div class="sub">Split songs into vocals, drums, bass and more with Demucs</div></div></div>

@@ -17,8 +17,8 @@ check((await app.page.textContent('[data-banner="app-update"]')).includes(want),
 
 const exited = new Promise((r) => app.proc.once("exit", r));
 await app.page.click('[data-banner="app-update"] .btn.primary');
-await app.page.waitForSelector(".activity .act", { timeout: 15000 });
-check(true, "download progress shown in the sidebar");
+await app.page.waitForSelector(".nav-badge.busy", { timeout: 15000 });
+check(true, "download shown as busy on the Downloads entry");
 await exited;
 check(true, "old process exited after swap");
 

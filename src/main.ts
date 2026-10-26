@@ -5,14 +5,17 @@ import { getVersion } from "@tauri-apps/api/app";
 import { availableMonitors, getCurrentWindow, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { icon, IconName } from "./icons";
-import { flushSettings, h, modal, settings, saveSettings, saveSettingsSoon } from "./core";
-import { mountActivity } from "./activity";
+import { clearers, flushSettings, h, modal, settings, saveSettings, saveSettingsSoon } from "./core";
+import { mountBadge, mountTasks } from "./activity";
+import { mountQueue, setModuleNames } from "./queue";
 import { checkForUpdate, startUpdateChecks } from "./update";
 import { renderBinaries, startBinaryChecks } from "./binaries";
 import { renderVideo } from "./modules/video";
 import { renderGallery } from "./modules/gallery";
 import { renderRembg } from "./modules/rembg";
 import { renderUpscale } from "./modules/upscale";
+import { renderSpotify } from "./modules/spotify";
+import { renderConverter } from "./modules/converter";
 import { renderAudible } from "./modules/audible";
 import { renderDemucs } from "./modules/demucs";
 import { renderWhisper } from "./modules/whisper";
@@ -32,9 +35,18 @@ const modules: Module[] = [
   {
     id: "video", name: "Video Downloader", icon: "download", section: "tools", render: renderVideo,
     info: {
-      about: "Downloads videos, playlists or just the audio. Best quality, 1080p, MP4 converted for Premiere (H.264 on your NVIDIA GPU) or MP3 320 kbps with cover.",
+      about: "Downloads videos, playlists and YouTube Mixes, or just the audio. Best quality, 4K, 1440p or 1080p (it tells you the container first), optional conversion to MP4 H.264 for Premiere on your GPU, or MP3 320 kbps with cover.",
       sources: ["YouTube (videos, Shorts, playlists)", "Vimeo", "TikTok", "Instagram", "X / Twitter", "Facebook", "Twitch (VODs, clips)", "Reddit", "SoundCloud", "Dailymotion", "Bilibili", "and 1,800+ more sites"],
       engine: "yt-dlp + FFmpeg", link: "https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md",
+    },
+  },
+  {
+    id: "spotify", name: "Spotify", icon: "music", section: "tools", render: renderSpotify,
+    info: {
+      about: "Downloads Spotify songs, albums, playlists and artists: each track is matched on YouTube Music and saved with the Spotify title, artist, album, cover and lyrics.",
+      sources: ["open.spotify.com links: track, album, playlist, artist"],
+      formats: "MP3 320 kbps, or M4A / Opus without re-encoding. Audio quality is YouTube Music's (about 128-256 kbps).",
+      engine: "spotDL + FFmpeg", link: "https://github.com/spotDL/spotify-downloader",
     },
   },
   {
@@ -53,10 +65,18 @@ const modules: Module[] = [
     },
   },
   {
-    id: "upscale", name: "Upscale", icon: "maximize", section: "tools", render: renderUpscale,
+    id: "upscale", name: "Image Upscale", icon: "maximize", section: "tools", render: renderUpscale,
     info: {
-      about: "Enlarges images 4× and videos 2-4× with AI detail recovery. Photo, illustration/anime and fast video models.",
-      formats: "PNG, JPG, WebP images; MP4, MKV, MOV, WebM, AVI videos (re-encoded to H.264 with the original audio).", engine: "Real-ESRGAN (ncnn, Vulkan GPU) + FFmpeg",
+      about: "Enlarges images 2-4× with AI detail recovery: photo, illustration/anime and fast models. For videos use Video Converter.",
+      formats: "PNG, JPG, WebP in; PNG out.", engine: "Real-ESRGAN (ncnn, Vulkan GPU)",
+    },
+  },
+  {
+    id: "converter", name: "Video Converter", icon: "film", section: "tools", render: renderConverter,
+    info: {
+      about: "Converts videos between formats, resizes them up or down (720p to 4K), changes frame rate and quality. Also extracts audio or makes GIFs.",
+      formats: "MP4, MKV, MOV, WebM, AVI and more in; MP4 H.264/H.265 (GPU), ProRes 422, WebM VP9, GIF, MP3, WAV out.",
+      engine: "FFmpeg (NVENC on NVIDIA GPUs)",
     },
   },
   {
@@ -81,9 +101,34 @@ const modules: Module[] = [
       engine: "audible-cli + FFmpeg",
     },
   },
+  { id: "downloads", name: "Downloads", icon: "list", section: "system", render: renderDownloads },
   { id: "binaries", name: "Binaries", icon: "layers", section: "system", render: renderBinaries },
   { id: "settings", name: "Settings", icon: "sliders", section: "system", render: renderSettings },
 ];
+
+setModuleNames((id) => modules.find((m) => m.id === id)?.name ?? id);
+
+/** Everything in one place: background tasks + the queue of every tool. */
+function renderDownloads(view: HTMLElement) {
+  const page = h(`<div class="page downloads"><div class="head"><div><h3>Downloads</h3>
+    <div class="sub">Everything Hermes is downloading or processing, from every tool. Expand an item to see its live console.</div></div></div>
+    <div class="tasks queue"></div></div>`);
+  mountTasks(page.querySelector(".tasks")!, (id) => modules.find((m) => m.id === id));
+  mountQueue(page);
+  view.append(page);
+}
+
+/** The "Clear" button: empties this tool's queue (except what is running) and its images/results. */
+function clearButton(m: Module): HTMLElement {
+  const b = h(`<button class="btn sm ghost" title="Remove this tool's finished, failed and waiting items and clear its images">${icon("broom")}Clear</button>`);
+  b.onclick = async () => {
+    await invoke("queue_clear_module", { module: m.id });
+    clearers.get(m.id)?.();
+    await flushSettings();
+    open(m.id);
+  };
+  return b;
+}
 
 /** The "Info" button every tool shows in its header. */
 function infoButton(m: Module): HTMLElement {
@@ -141,6 +186,17 @@ async function renderSettings(view: HTMLElement) {
   const stats = prefs.querySelector<HTMLInputElement>("#show-stats")!;
   stats.checked = settings.showStats !== false;
   stats.onchange = () => saveSettings({ showStats: stats.checked });
+  const par = h(`<div class="row"><div><div class="v">Downloads at the same time</div>
+    <div class="sub">How many queue items run in parallel (1-10). Higher is faster but sites rate-limit sooner.</div></div>
+    <input type="number" min="1" max="10" class="num" id="max-concurrent"></div>`);
+  const max = par.querySelector<HTMLInputElement>("input")!;
+  max.value = String(settings.maxConcurrent ?? 6);
+  max.onchange = () => {
+    const n = Math.min(10, Math.max(1, Math.round(Number(max.value) || 6)));
+    max.value = String(n);
+    saveSettings({ maxConcurrent: n });
+  };
+  prefs.append(par);
   el.append(prefs);
   el.querySelector("#data-path")!.textContent = path;
   (el.querySelector("#open-data") as HTMLElement).onclick = () => revealItemInDir(path);
@@ -178,7 +234,7 @@ function open(id: string) {
       if (!head) return requestAnimationFrame(attach);
       let right = head.querySelector(".right");
       if (!right) head.append((right = h(`<div class="right"></div>`)));
-      right.prepend(infoButton(mod));
+      right.prepend(clearButton(mod), infoButton(mod));
     };
     attach();
   }
@@ -187,16 +243,16 @@ function open(id: string) {
 
 // ---------- sidebar ----------
 const side = document.getElementById("side")!;
-const activity = h(`<div class="activity" hidden></div>`);
-mountActivity(activity, (id) => modules.find((m) => m.id === id));
+const badge = h(`<span class="nav-badge"></span>`); // running/queued count on "Downloads"
+mountBadge(badge);
 function renderSidebar() {
   side.replaceChildren();
   for (const section of ["tools", "system"] as const) {
     side.append(section === "tools" ? h(`<div class="label">Tools</div>`) : h(`<div class="spacer"></div>`));
-    if (section === "system") side.append(activity);
     for (const m of visible().filter((m) => m.section === section)) {
       const n = h(`<button class="nav ${m.id === current ? "on" : ""}" data-id="${m.id}">${icon(m.icon)}<span>${m.name}</span></button>`);
       n.onclick = () => open(m.id);
+      if (m.id === "downloads") n.append(badge);
       side.append(n);
     }
   }

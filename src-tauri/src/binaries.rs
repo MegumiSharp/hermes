@@ -16,6 +16,7 @@ use std::{
 use tauri::{AppHandle, Emitter};
 
 pub const NO_WINDOW: u32 = 0x0800_0000;
+const BELOW_NORMAL_PRIORITY: u32 = 0x0000_4000;
 const MAGIC: &[u8; 8] = b"HERMESPK";
 
 #[derive(Deserialize)]
@@ -84,8 +85,22 @@ pub fn command(file: &str) -> tokio::process::Command {
     c.env("TORCH_HOME", data_dir().join("models").join("torch"));
     c.env("HF_HOME", data_dir().join("models").join("hf"));
     c.env("HF_HUB_DISABLE_SYMLINKS_WARNING", "1");
-    c.creation_flags(NO_WINDOW);
+    // below-normal priority: heavy jobs never make the PC sluggish, they just yield to what you're doing
+    c.creation_flags(NO_WINDOW | BELOW_NORMAL_PRIORITY);
     c
+}
+
+/// Runs a bundled tool and returns its output; Err = the tool's error text (non-zero exit).
+#[tauri::command]
+pub async fn tool_text(bin: String, args: Vec<String>) -> Result<String, String> {
+    let out = command(&bin).args(&args).stdin(std::process::Stdio::null()).output().await.map_err(err)?;
+    let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+    if out.status.success() {
+        Ok(text)
+    } else {
+        let last = text.lines().map(str::trim).filter(|l| !l.is_empty()).last().unwrap_or("The tool failed without a message");
+        Err(last.to_string())
+    }
 }
 
 /// Runs a bundled tool that prints JSON (`yt-dlp -J`, `gallery-dl -j`) and returns it parsed.

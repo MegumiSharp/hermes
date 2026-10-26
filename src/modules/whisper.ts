@@ -1,6 +1,6 @@
 // Subtitles module (SPEC 13): faster-whisper on the portable AI runtime.
 import { invoke } from "@tauri-apps/api/core";
-import { h, memory } from "../core";
+import { clearers, h, memory } from "../core";
 import { icon } from "../icons";
 import { addJobs, mountQueue, NewJob } from "../queue";
 import { confirmModelDownload, runtimeNotice, runtimeReady } from "./ai";
@@ -24,6 +24,7 @@ export function renderWhisper(view: HTMLElement) {
     folder: "", model: "large-v3-turbo", language: "", translate: false, formats: ["srt"] as string[], files: [] as string[], tray: [] as TrayItem[],
   });
   if (state.files.length) { state.tray = state.files.map((path) => ({ path })); state.files = []; } // pre-T12 shape
+  clearers.set("whisper", () => { state.tray = []; save(); });
 
   const page = h(`<div class="page whisper">
     <div class="head"><div><h3>Subtitles</h3><div class="sub">Transcribe or translate speech to SRT, VTT or text with faster-whisper</div></div></div>

@@ -2,7 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { binariesReady } from "../binaries";
-import { banner, h, memory } from "../core";
+import { banner, clearers, h, memory } from "../core";
 import { icon } from "../icons";
 import { addJobs, mountQueue, watchJobs } from "../queue";
 import { folderField } from "./common";
@@ -24,6 +24,8 @@ export function renderAudible(view: HTMLElement) {
   const { state, save } = memory("audible", {
     folder: "", country: "it", search: "", selected: [] as string[], pendingUrl: "", loginStarted: false,
   });
+
+  clearers.set("audible", () => { Object.assign(state, { search: "", selected: [] }); save(); });
 
   const page = h(`<div class="page audible">
     <div class="head"><div><h3>Audible</h3><div class="sub">Your purchased audiobooks as M4B files with chapters and cover</div></div>

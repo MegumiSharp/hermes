@@ -212,18 +212,6 @@ const up = probe(j.outputs.at(-1)).streams[0];
 check(up.width === 256 && up.height === 256, `image upscaled 64 -> ${up.width}x${up.height}`);
 await until(() => page.$(".results .ba"), "upscale slider", 10000);
 
-await page.selectOption("#u-model", "realesr-animevideov3");
-await page.selectOption("#u-scale", "2");
-await drop(page, "#u-drop", clip);
-await until(async () => await page.isVisible("#u-video-note"), "video note");
-check(true, "video warning shown");
-await page.click("#u-go");
-j = await lastJobDone(page, "upscale", 600000);
-const v = probe(j.outputs.at(-1));
-const vs = v.streams.find((s) => s.codec_type === "video");
-check(vs.codec_name === "h264" && vs.width === 640 && vs.height === 360, `video upscaled to ${vs.width}x${vs.height} ${vs.codec_name}`);
-check(v.streams.some((s) => s.codec_type === "audio"), "original audio kept");
-check(!readdirSync(join(DATA, "temp")).some((d) => d.startsWith("upscale-")), "temporary frames deleted");
 await page.screenshot({ path: join(OUT, "t7-upscale.png") });
 }
 

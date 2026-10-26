@@ -44,6 +44,15 @@
     "notify": false
   },
   {
+    "id": "spotdl",
+    "name": "spotDL",
+    "api": "https://api.github.com/repos/spotDL/spotify-downloader/releases/latest",
+    "asset": "spotdl-*-win32.exe",
+    "files": ["spotdl.exe"],
+    "verify": ["--version"],
+    "notify": true
+  },
+  {
     "id": "audible",
     "name": "audible-cli",
     "api": "https://api.github.com/repos/mkb79/audible-cli/releases/latest",

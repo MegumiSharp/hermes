@@ -88,6 +88,15 @@ fn write_job_file(name: String, text: String) -> Result<String, String> {
     Ok(path.display().to_string())
 }
 
+/// Reads a file from hermes-data/jobs (e.g. the song list `spotdl save` wrote).
+#[tauri::command]
+fn read_job_file(name: String) -> Result<String, String> {
+    if name.contains(['/', '\\']) || name.contains("..") {
+        return Err("invalid file name".into());
+    }
+    fs::read_to_string(data_dir().join("jobs").join(name)).map_err(|e| e.to_string())
+}
+
 /// Copies a result to a user folder ("Keep" in compare mode); creates the folder.
 #[tauri::command]
 fn copy_file(from: String, to: String) -> Result<(), String> {
@@ -170,6 +179,8 @@ pub fn run() {
             binaries::binaries_latest,
             binaries::binary_update,
             binaries::tool_json,
+            binaries::tool_text,
+            read_job_file,
             cookies::detect_browsers,
             cookies::cookies_write,
             cookies::cookies_path,
@@ -180,6 +191,7 @@ pub fn run() {
             queue::queue_pause_all,
             queue::queue_clear_finished,
             queue::queue_resume_now,
+            queue::queue_clear_module,
             audible::audible_status,
             audible::audible_login_start,
             audible::audible_login_finish,

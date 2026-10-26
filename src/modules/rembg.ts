@@ -4,10 +4,10 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { startTask, taskRunning } from "../activity";
-import { banner, h, memory, modal } from "../core";
+import { banner, clearers, h, memory, modal } from "../core";
 import { icon } from "../icons";
 import { addJobs, mountQueue, Step } from "../queue";
-import { eagleControls, fileName, fileTray, folderField, paths, resultsPanel, resultViewer, statsBar, stem, TrayItem } from "./common";
+import { eagleControls, fileName, fileTray, folderField, resultsPanel, resultViewer, statsBar, stem, TrayItem } from "./common";
 
 type Model = { id: string; name: string; mb: number; speed: string; useCase: string; installed: boolean };
 type CompareResult = { model: string; output: string; ms: number; device: string; error: string | null };
@@ -229,10 +229,7 @@ export function renderRembg(view: HTMLElement) {
     }
   }
 
-  const outputFor = async (input: string, suffix: string) => {
-    const dir = state.eagle ? (await paths).results : state.folder; // Eagle mode keeps a copy for the slider
-    return `${dir}\\${stem(input)}-${suffix}-${Date.now()}.png`;
-  };
+  const outputFor = (input: string, suffix: string) => `${state.folder}\\${stem(input)}-${suffix}-${Date.now()}.png`;
 
   // ----- run -----
   goBtn.onclick = async () => {
@@ -240,7 +237,7 @@ export function renderRembg(view: HTMLElement) {
       const todo = batch.pending();
       const modelName = models.find((m) => m.id === state.model)?.name ?? state.model;
       const jobs = await Promise.all(todo.map(async (it) => {
-        const steps: Step[] = [{ type: "rembg", model: state.model, input: it.path, output: await outputFor(it.path, "nobg"), background: state.background, crop: state.crop }];
+        const steps: Step[] = [{ type: "rembg", model: state.model, input: it.path, output: outputFor(it.path, "nobg"), background: state.background, crop: state.crop }];
         if (state.eagle) steps.push({ type: "eagle", keep: true });
         return { module: "rembg", title: fileName(it.path), pill: modelName, steps, source: it.path, eagle: { tags: ["Background removed"] } };
       }));
@@ -318,6 +315,10 @@ export function renderRembg(view: HTMLElement) {
   }
 
   redraw = () => { if (page.isConnected) { drawResults(); update(); } };
+  clearers.set("rembg", () => {
+    Object.assign(state, { batch: [], compareFile: [], results: [] });
+    save();
+  });
   setMode(state.mode);
   drawResults();
   loadModels();

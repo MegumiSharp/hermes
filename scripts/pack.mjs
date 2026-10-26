@@ -3,7 +3,7 @@
 //   [exe][file bytes...][manifest json][u64 LE manifest length]["HERMESPK"]
 // Downloads are cached in vendor/<id>/ and refreshed when a newer release exists.
 import { execFileSync } from "node:child_process";
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 
 const tools = JSON.parse(readFileSync("src-tauri/binaries.json", "utf8"));
@@ -74,6 +74,8 @@ async function fetchTool(t) {
     }
     rmSync(x, { recursive: true });
     rmSync(file);
+  } else if (asset.name !== t.files[0]) {
+    renameSync(file, join(dir, t.files[0])); // versioned asset name (spotdl-4.6.0-win32.exe) -> spotdl.exe
   }
   writeFileSync(join(dir, "version.json"), JSON.stringify(ver));
   return ver;

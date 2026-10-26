@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { toolStatus, binariesReady } from "../binaries";
 import { cookieArgs, cookieLabel, cookiesModal, isCookieError, markBroken } from "../cookies";
 import { SITES, siteForUrl } from "../cookies-validate";
-import { banner, h, saveSettings, saveSettingsSoon, settings } from "../core";
+import { banner, clearers, h, saveSettings, saveSettingsSoon, settings } from "../core";
 import { icon } from "../icons";
 import { addJobs, mountQueue, Step } from "../queue";
 import { eagleControls, folderField, paths } from "./common";
@@ -206,19 +206,10 @@ export function renderGallery(view: HTMLElement) {
       ? `${sel.length} of ${items.length} selected${visible.length < items.length ? ` · ${items.length - visible.length} hidden by filters` : ""}`
       : "Fetch a URL to preview its files";
     addBtn.disabled = !sel.length;
-    grid.classList.toggle("as-list", !prefs.previews);
+    $("#g-all").hidden = $("#g-none").hidden = !prefs.previews;
     if (!prefs.previews) {
-      // list view (default): readable with hundreds of files and needs no remote thumbnails
-      grid.replaceChildren(...visible.map((i) => {
-        const r = h(`<button type="button" class="g-row tile ${i.off ? "off" : ""}" data-key="">
-          <span class="t-check">${icon("check")}</span>${icon(i.kind === "video" ? "film" : "image")}
-          <span class="g-name"><b></b><span class="sub"></span></span><span class="mono sub g-meta"></span></button>`);
-        r.dataset.key = i.key;
-        r.querySelector("b")!.textContent = i.title || i.key;
-        r.querySelector(".g-name .sub")!.textContent = i.title ? i.key : i.author;
-        r.querySelector(".g-meta")!.textContent = [i.ext.toUpperCase(), i.w && i.h ? `${i.w}×${i.h}` : "", i.date ? new Date(i.date).toLocaleDateString() : ""].filter(Boolean).join(" · ");
-        return r;
-      }));
+      // previews off (default): no per-file list, only the counts; the filters decide what downloads
+      grid.replaceChildren();
       return;
     }
     grid.replaceChildren(...visible.map((i) => {
@@ -242,6 +233,11 @@ export function renderGallery(view: HTMLElement) {
     items.filter((i) => i.key === t.dataset.key).forEach((i) => (i.off = !i.off));
     saveOff();
     renderGrid();
+  });
+  clearers.set("gallery", () => {
+    Object.assign(prefs, { url: "", offKeys: [] });
+    settings.galleryDraft = "";
+    save();
   });
   const previews = $<HTMLInputElement>("#g-previews");
   previews.checked = prefs.previews;

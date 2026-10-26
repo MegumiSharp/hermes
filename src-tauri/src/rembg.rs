@@ -161,6 +161,9 @@ fn load(m: &'static Model, mode: Mode) -> Result<Session, String> {
             .map_err(e)?,
         Mode::Cpu => b.with_execution_providers([ep::CPU::default().build()]).map_err(e)?,
     };
+    // leave half the cores free so the PC stays responsive (CPU work: fallback mode + graph ops)
+    let cores = std::thread::available_parallelism().map_or(4, |n| n.get());
+    b = b.with_intra_threads((cores / 2).max(1)).map_err(e)?;
     if mode == Mode::GpuSafe {
         b = b.with_optimization_level(GraphOptimizationLevel::Level1).map_err(e)?; // no node fusion
     }
@@ -257,11 +260,23 @@ fn compose(img: &DynamicImage, mask: &GrayImage, background: &str, crop: bool) -
     out
 }
 
+/// Inference runs below normal priority so the desktop stays fluid while a model works.
+fn lower_thread_priority() {
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetCurrentThread() -> *mut std::ffi::c_void;
+        fn SetThreadPriority(thread: *mut std::ffi::c_void, priority: i32) -> i32;
+    }
+    const THREAD_PRIORITY_BELOW_NORMAL: i32 = -1;
+    unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL) };
+}
+
 /// Queue step entry point: input image -> PNG cut-out at `output`. Returns the device used.
 pub async fn remove(model_id: &str, input: &str, output: &str, background: &str, crop: bool) -> Result<&'static str, String> {
     let m = model(model_id)?;
     let (input, output, background) = (input.to_string(), output.to_string(), background.to_string());
     tauri::async_runtime::spawn_blocking(move || {
+        lower_thread_priority();
         let img = open_image(&input)?;
         let (mask, mode) = predict(m, &img)?;
         if let Some(dir) = PathBuf::from(&output).parent() {
