@@ -67,4 +67,5 @@ Tieni **Eagle aperto** per i test con Eagle.
 ## Test automatici (li lancio io; da sistemare quando vuoi)
 - `scripts/t3-test.mjs`: tutto ok tranne il controllo sul testo d'errore di ffmpeg.
 - `scripts/t4-test.mjs`: si ferma al 2° download per un bug del test (non dell'app); MP4/1080p/Eagle/playlist non ancora coperti in automatico.
-- `scripts/t5-7-test.mjs`: vedi il risultato riportato nell'ultimo messaggio.
+- `scripts/t5-7-test.mjs` con `ONLY=rembg,upscale`: **tutto passato** (download modelli con conferma, PNG trasparente, slider, sfondo pieno + crop, compare con tempi, Keep, upscale immagine 4×, upscale video 2× con audio, pulizia temp).
+- `scripts/t5-7-test.mjs` sezione gallery: anteprima, filtri (estensioni, risoluzione), selezione/deselezione **ok**; il download non è stato verificato fino in fondo perché Wikimedia ha limitato il mio IP (429) dopo molti test. Hermes ha reagito correttamente con la pausa da 5 e poi 10 minuti. Da riprovare con una tua galleria.

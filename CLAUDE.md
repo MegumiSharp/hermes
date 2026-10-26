@@ -11,6 +11,8 @@ Portable Windows utility app (no installer) for a content creator. Personal use,
 ## Open issues (fix only when the owner asks)
 - t3-test "failure keeps the tool's error": ffmpeg's final line is "Error opening input files: No such file or directory" (file name is on an earlier line). Decide: better error capture or relax the test.
 - t4-test stops at the 2nd download: after "Add to queue" the preview is only hidden, its `.t` stays in the DOM, so `addAndWait` skips re-fetching and clicks a disabled button. Test bug; MP4/1080p/Eagle/playlist paths of T4 not yet covered by the automated run.
+- t5-7-test gallery section: Wikimedia rate-limits this IP after repeated runs (429 → queue cooldown, test times out). Run with `ONLY=rembg,upscale` or point the gallery test at another source.
+- v0.3.0 (T5-T7) not released yet: publishing needs the owner's go-ahead (`node scripts/release.mjs 0.3.0`).
 - Hermes.exe needs the VC++ 2015-2022 runtime (MSVCP140.dll, from ONNX Runtime). Present on almost every PC.
 
 ## Conventions
