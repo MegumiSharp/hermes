@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hermes Mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#0b0b0c; color:#e8e8ea; font-family:Inter, system-ui, sans-serif; padding:40px 24px 80px; }
+  .page-head { max-width:1180px; margin:0 auto 32px; }
+  .page-head h1 { font-size:22px; font-weight:600; margin:0 0 6px; }
+  .page-head p { color:#8a8a92; margin:0; font-size:14px; }
+  section.variant { max-width:1180px; margin:0 auto 64px; }
+  .variant-head { display:flex; align-items:baseline; gap:14px; margin-bottom:14px; }
+  .variant-head .num { font:500 13px 'JetBrains Mono', monospace; color:#6b6b73; }
+  .variant-head h2 { font-size:18px; font-weight:600; margin:0; }
+  .variant-head span.desc { color:#8a8a92; font-size:13px; }
+  .scroll { overflow-x:auto; }
+
+  /* ---------- app window (themed via variables) ---------- */
+  .win { --r: 8px; min-width:1100px; height:700px; display:flex; flex-direction:column; background:var(--bg); color:var(--text);
+         font-family:var(--font); border:1px solid var(--border); border-radius:calc(var(--r) + 4px); overflow:hidden; font-size:13px; position:relative; }
+  svg.i { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+  .titlebar { height:38px; display:flex; align-items:center; padding:0 0 0 14px; border-bottom:1px solid var(--border); background:var(--chrome); gap:10px; flex:none; }
+  .titlebar .mark { width:20px; height:20px; border-radius:calc(var(--r) / 2); background:var(--accent); color:var(--accent-fg); display:grid; place-items:center; }
+  .titlebar .mark svg { width:13px; height:13px; stroke-width:2.2; }
+  .titlebar .name { font-weight:600; letter-spacing:.02em; }
+  .titlebar .ver { color:var(--muted); font-family:var(--mono); font-size:11px; }
+  .titlebar .wc { margin-left:auto; display:flex; }
+  .titlebar .wc div { width:46px; height:38px; display:grid; place-items:center; color:var(--muted); }
+  .titlebar .wc svg { width:13px; height:13px; }
+  .body { flex:1; display:flex; min-height:0; }
+
+  .side { width:208px; background:var(--chrome); border-right:1px solid var(--border); padding:14px 10px; display:flex; flex-direction:column; gap:2px; flex:none; }
+  .side .label { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); padding:6px 10px 8px; }
+  .nav { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:var(--r); color:var(--muted); }
+  .nav.on { background:var(--surface); color:var(--text); box-shadow: inset 2px 0 0 var(--accent); }
+  .nav .tag { margin-left:auto; font-size:10px; font-family:var(--mono); color:var(--muted); }
+  .side .spacer { flex:1; }
+  .side.rail { width:56px; align-items:center; padding:12px 8px; }
+  .side.rail .label, .side.rail .nav span, .side.rail .nav .tag { display:none; }
+  .side.rail .nav { width:40px; height:40px; justify-content:center; padding:0; }
+  .side.rail .nav.on { box-shadow:none; background:var(--accent-soft); color:var(--accent); }
+
+  .main { flex:1; display:flex; min-width:0; }
+  .col { flex:1; padding:20px 24px; display:flex; flex-direction:column; gap:14px; min-width:0; overflow:hidden; }
+  .split .queue-col { width:360px; border-left:1px solid var(--border); background:var(--chrome); padding:20px 18px; display:flex; flex-direction:column; gap:12px; flex:none; }
+
+  .head { display:flex; align-items:center; gap:12px; }
+  .head h3 { margin:0; font-size:17px; font-weight:600; }
+  .head .sub { color:var(--muted); font-size:12px; }
+  .chip { display:inline-flex; align-items:center; gap:6px; padding:4px 9px; border:1px solid var(--border); border-radius:999px; font-size:11px; color:var(--muted); font-family:var(--mono); white-space:nowrap; }
+  .chip .dot { width:6px; height:6px; border-radius:50%; background:var(--ok); }
+  .chip.warn .dot { background:var(--warn); }
+  .head .right { margin-left:auto; display:flex; gap:8px; }
+
+  .banner { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:var(--r); background:var(--accent-soft); border:1px solid var(--accent-line); color:var(--text); }
+  .banner svg { color:var(--accent); }
+  .banner .acts { margin-left:auto; display:flex; gap:6px; }
+
+  .btn { display:inline-flex; align-items:center; gap:7px; height:32px; padding:0 14px; border-radius:var(--r); border:1px solid var(--border); background:var(--surface); color:var(--text); font:inherit; font-weight:500; white-space:nowrap; }
+  .btn.sm { height:26px; padding:0 10px; font-size:12px; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:var(--accent-fg); }
+  .btn.ghost { background:transparent; border-color:transparent; color:var(--muted); }
+
+  .url { display:flex; gap:8px; }
+  .field { flex:1; display:flex; align-items:center; gap:9px; height:38px; padding:0 12px; border:1px solid var(--border); background:var(--field); border-radius:var(--r); color:var(--muted); min-width:0; }
+  .field .v { color:var(--text); font-family:var(--mono); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .url .btn { height:38px; }
+
+  .preview { display:flex; gap:16px; padding:12px; border:1px solid var(--border); border-radius:calc(var(--r) + 2px); background:var(--surface); }
+  .thumb { width:208px; height:117px; border-radius:var(--r); background:var(--thumb); position:relative; flex:none; overflow:hidden; }
+  .thumb::after { content:""; position:absolute; inset:0; background:repeating-linear-gradient(135deg, transparent 0 22px, rgba(255,255,255,.03) 22px 23px); }
+  .thumb .dur { position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,.72); color:#fff; font:500 11px var(--mono); padding:2px 5px; border-radius:4px; z-index:1; }
+  .meta { display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .meta .t { font-size:15px; font-weight:600; line-height:1.3; }
+  .meta .c { color:var(--muted); }
+  .meta .facts { display:flex; gap:6px; flex-wrap:wrap; margin-top:auto; }
+
+  .opts { display:grid; grid-template-columns: 1.1fr 1.2fr; gap:10px; align-items:end; position:relative; }
+  .split .opts { grid-template-columns: 1fr 1fr; }
+  .opt label { display:block; font-size:11px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.06em; }
+  .select { display:flex; align-items:center; gap:8px; height:36px; padding:0 12px; border:1px solid var(--accent-line); border-radius:var(--r); background:var(--field); }
+  .select .chev { margin-left:auto; color:var(--muted); }
+  .menu { position:absolute; top:62px; left:0; width:340px; background:var(--menu); border:1px solid var(--border); border-radius:calc(var(--r) + 2px); padding:5px; z-index:5; box-shadow:0 18px 40px rgba(0,0,0,.5); }
+  .mi { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:var(--r); }
+  .mi.on { background:var(--surface); }
+  .mi .d { color:var(--muted); font-size:11px; font-family:var(--mono); margin-left:auto; }
+  .mi .ck { color:var(--accent); }
+  .pill { font-size:10px; font-weight:600; padding:2px 7px; border-radius:999px; background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent-line); letter-spacing:.03em; white-space:nowrap; }
+  .sep { height:1px; background:var(--border); margin:4px 6px; }
+
+  .row2 { display:flex; gap:10px; align-items:center; }
+  .check { display:flex; align-items:center; gap:9px; padding:0 12px; height:36px; border:1px solid var(--border); border-radius:var(--r); background:var(--field); white-space:nowrap; }
+  .box { width:16px; height:16px; border-radius:4px; background:var(--accent); color:var(--accent-fg); display:grid; place-items:center; }
+  .box svg { width:11px; height:11px; stroke-width:3; }
+  .check .s { color:var(--muted); font-size:12px; }
+  .row2 .btn.primary { margin-left:auto; height:36px; }
+
+  .qhead { display:flex; align-items:center; gap:10px; }
+  .qhead h4 { margin:0; font-size:14px; font-weight:600; }
+  .qhead .count { font-family:var(--mono); font-size:12px; color:var(--muted); }
+  .qhead .count b { color:var(--text); font-weight:500; }
+  .qhead .right { margin-left:auto; display:flex; gap:4px; }
+  .bar { height:4px; border-radius:999px; background:var(--track); overflow:hidden; }
+  .bar i { display:block; height:100%; background:var(--accent); border-radius:inherit; }
+  .bar.thick { height:6px; }
+  .overall { display:flex; align-items:center; gap:10px; }
+  .overall .bar { flex:1; }
+  .overall .pct { font-family:var(--mono); font-size:12px; width:36px; text-align:right; }
+
+  .list { display:flex; flex-direction:column; gap:6px; overflow:hidden; }
+  .item { border:1px solid var(--border); border-radius:var(--r); background:var(--surface); padding:9px 11px; display:flex; flex-direction:column; gap:7px; }
+  .item .top { display:flex; align-items:center; gap:9px; min-width:0; }
+  .item .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; min-width:0; }
+  .item .st { margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--muted); white-space:nowrap; }
+  .item .ic { color:var(--muted); }
+  .item.done .ic { color:var(--ok); }
+  .item.warn .ic { color:var(--warn); }
+  .item .bot { display:flex; align-items:center; gap:10px; font-family:var(--mono); font-size:11px; color:var(--muted); }
+  .item .bot .bar { flex:1; }
+  .kids { margin:2px 0 0 8px; padding-left:12px; border-left:1px solid var(--border); display:flex; flex-direction:column; gap:5px; }
+  .kid { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); }
+  .kid .nm { font-weight:400; color:var(--text); }
+  .kid .st { margin-left:auto; font-family:var(--mono); font-size:11px; }
+  .kid.done svg { color:var(--ok); }
+
+  /* ---------- themes ---------- */
+  .t1 { --bg:#141416; --chrome:#101012; --surface:#1b1b1e; --field:#121214; --menu:#1d1d21; --border:#2a2a2f; --text:#ececef; --muted:#8b8b94;
+        --accent:#f2a33a; --accent-fg:#1a1205; --accent-soft:rgba(242,163,58,.10); --accent-line:rgba(242,163,58,.35); --track:#2a2a2f;
+        --ok:#58c48b; --warn:#f2a33a; --thumb:linear-gradient(135deg,#3a2a14,#1b1b1e 60%,#2a1d0d); --font:Inter, sans-serif; --mono:'JetBrains Mono', monospace; --r:8px; }
+  .t2 { --bg:#0a0a0a; --chrome:#0a0a0a; --surface:#121212; --field:#0e0e0e; --menu:#141414; --border:#222; --text:#e6e6e6; --muted:#7a7a7a;
+        --accent:#c6f432; --accent-fg:#0a0a0a; --accent-soft:rgba(198,244,50,.08); --accent-line:rgba(198,244,50,.32); --track:#1f1f1f;
+        --ok:#c6f432; --warn:#ffb020; --thumb:linear-gradient(135deg,#1d2410,#0e0e0e 65%); --font:'IBM Plex Sans', sans-serif; --mono:'JetBrains Mono', monospace; --r:4px; }
+  .t3 { --bg:#0e1420; --chrome:#0b101a; --surface:#151d2b; --field:#0c121c; --menu:#172031; --border:#223047; --text:#e3e9f3; --muted:#7f8ea6;
+        --accent:#3cc8e8; --accent-fg:#06202a; --accent-soft:rgba(60,200,232,.10); --accent-line:rgba(60,200,232,.35); --track:#1f2a3d;
+        --ok:#4fd1a5; --warn:#f5b84a; --thumb:linear-gradient(135deg,#0f3442,#151d2b 60%,#1a2440); --font:Manrope, sans-serif; --mono:'JetBrains Mono', monospace; --r:12px; }
+  .t4 { --bg:#131215; --chrome:#0f0e11; --surface:#1b1a1f; --field:#111013; --menu:#1e1c23; --border:#2b2930; --text:#ebe9f0; --muted:#8c8896;
+        --accent:#9b87f5; --accent-fg:#ffffff; --accent-soft:rgba(155,135,245,.12); --accent-line:rgba(155,135,245,.38); --track:#2b2930;
+        --ok:#6fcf97; --warn:#f2c94c; --thumb:linear-gradient(135deg,#2a2245,#1b1a1f 60%,#221b33); --font:Inter, sans-serif; --mono:'JetBrains Mono', monospace; --r:10px; }
+  .t5 { --bg:#000; --chrome:#000; --surface:#0d0d0d; --field:#000; --menu:#0d0d0d; --border:#262626; --text:#fafafa; --muted:#737373;
+        --accent:#ff3b30; --accent-fg:#fff; --accent-soft:rgba(255,59,48,.08); --accent-line:rgba(255,59,48,.45); --track:#1f1f1f;
+        --ok:#fafafa; --warn:#ff3b30; --thumb:linear-gradient(135deg,#2a0b09,#0d0d0d 60%); --font:'Space Grotesk', sans-serif; --mono:'JetBrains Mono', monospace; --r:2px; }
+  .t5 .titlebar .name { text-transform:uppercase; letter-spacing:.18em; font-size:12px; }
+  .t5 .head h3 { text-transform:uppercase; letter-spacing:.06em; font-size:15px; }
+</style>
+</head>
+<body>
+<div class="page-head">
+  <h1>Hermes: design directions</h1>
+  <p>Five directions on the same screen: yt-dlp module, format menu open, update banner, persistent queue with an expanded playlist. Pick one, or mix (for example the layout of 3 with the colors of 1).</p>
+</div>
+<div id="root"></div>
+
+<script>
+const P = {
+  logo:'<path d="M12.67 19a2 2 0 0 0 1.416-.588l6.154-6.172a6 6 0 0 0-8.49-8.49L5.586 9.914A2 2 0 0 0 5 11.328V18a1 1 0 0 0 1 1z"/><path d="M16 8 2 22"/><path d="M17.5 15H9"/>',
+  dl:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  img:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
+  cog:'<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+  folder:'<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>',
+  link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  down:'<polyline points="6 9 12 15 18 9"/>', right:'<polyline points="9 18 15 12 9 6"/>',
+  check:'<polyline points="20 6 9 17 4 12"/>', x:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  min:'<line x1="5" y1="12" x2="19" y2="12"/>', max:'<rect x="5" y="5" width="14" height="14" rx="1"/>',
+  pause:'<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>',
+  refresh:'<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+  music:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  film:'<rect x="2" y="3" width="20" height="18" rx="2"/><line x1="7" y1="3" x2="7" y2="21"/><line x1="17" y1="3" x2="17" y2="21"/><line x1="2" y1="12" x2="22" y2="12"/>',
+  list:'<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r=".5"/><circle cx="3.5" cy="12" r=".5"/><circle cx="3.5" cy="18" r=".5"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>',
+  alert:'<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  cookie:'<path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"/><circle cx="8.5" cy="8.5" r=".5"/><circle cx="16" cy="15.5" r=".5"/><circle cx="12" cy="12" r=".5"/><circle cx="7" cy="14" r=".5"/>',
+  layers:'<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+  trash:'<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+};
+const ic = n => `<svg class="i" viewBox="0 0 24 24">${P[n]}</svg>`;
+
+const variants = [
+  { cls:'t1', layout:'stack', side:'full', name:'Graphite / Amber', desc:'Warm and calm. Inter, 8px radius, labeled sidebar, queue under the form.' },
+  { cls:'t2', layout:'split', side:'rail', name:'Obsidian / Lime', desc:'Technical, terminal-like. Icon rail, 4px radius, queue always visible on the right.' },
+  { cls:'t3', layout:'split', side:'full', name:'Midnight / Cyan', desc:'Soft blue-black, Manrope, 12px radius. Spacious, three columns.' },
+  { cls:'t4', layout:'stack', side:'rail', name:'Carbon / Violet', desc:'Neutral carbon with a violet accent, icon rail, wide working area.' },
+  { cls:'t5', layout:'split', side:'full', name:'Mono / Signal Red', desc:'Pure black, Swiss-style, sharp corners. Red used only for action and progress.' },
+];
+
+const sidebar = s => `
+  <div class="side ${s === 'rail' ? 'rail' : ''}">
+    <div class="label">Tools</div>
+    <div class="nav on">${ic('dl')}<span>yt-dlp</span><span class="tag">2026.10.22</span></div>
+    <div class="nav">${ic('img')}<span>gallery-dl</span><span class="tag">1.30.9</span></div>
+    <div class="spacer"></div>
+    <div class="nav">${ic('layers')}<span>Binaries</span></div>
+    <div class="nav">${ic('cog')}<span>Settings</span></div>
+  </div>`;
+
+const form = layout => `
+  <div class="head">
+    <div><h3>yt-dlp</h3><div class="sub">Video and audio from YouTube and 1,800+ sites</div></div>
+    <div class="right">
+      <span class="chip"><span class="dot"></span>yt-dlp 2026.10.22</span>
+      <span class="chip">${ic('cookie')}Firefox cookies</span>
+    </div>
+  </div>
+  <div class="banner">${ic('refresh')}<span><b>Hermes 0.4.0</b> is available.</span>
+    <div class="acts"><button class="btn sm ghost">Later</button><button class="btn sm primary">Update</button></div></div>
+  <div class="url">
+    <div class="field">${ic('link')}<span class="v">https://www.youtube.com/watch?v=8f3kQx2LmPa</span></div>
+    <button class="btn">Fetch</button>
+  </div>
+  <div class="preview">
+    <div class="thumb"><span class="dur">18:42</span></div>
+    <div class="meta">
+      <div class="t">Building a Hall-Effect Keyboard From Scratch</div>
+      <div class="c">Northbound Studio · 412K views · Oct 19, 2026</div>
+      <div class="facts"><span class="chip">2160p60</span><span class="chip">VP9</span><span class="chip">Opus 160k</span><span class="chip">~2.4 GB</span></div>
+    </div>
+  </div>
+  <div class="opts">
+    <div class="opt"><label>Format</label>
+      <div class="select">${ic('film')}<span>MP4</span><span class="pill">CONVERTED</span><span class="chev">${ic('down')}</span></div></div>
+    <div class="opt"><label>Save to</label>
+      <div class="field" style="height:36px">${ic('folder')}<span class="v">D:\\Downloads\\Hermes</span></div></div>
+    <div class="menu">
+      <div class="mi">${ic('film')}Best quality<span class="d">2160p WebM</span></div>
+      <div class="mi">${ic('film')}1080p<span class="d">MP4 H.264</span></div>
+      <div class="mi on">${ic('film')}MP4 <span class="pill">CONVERTED</span><span class="d">NVENC</span><span class="ck">${ic('check')}</span></div>
+      <div class="sep"></div>
+      <div class="mi">${ic('music')}Audio only<span class="d">MP3 320k</span></div>
+    </div>
+  </div>
+  <div class="row2">
+    <div class="check"><span class="box">${ic('check')}</span>Send to Eagle<span class="s">Uncategorized</span></div>
+    <span class="chip"><span class="dot"></span>Eagle connected</span>
+    <button class="btn primary">${ic('dl')}Add to queue</button>
+  </div>`;
+
+const queue = compact => `
+  <div class="qhead"><h4>Queue</h4><span class="count"><b>4</b> / 11 done</span>
+    <div class="right"><button class="btn sm ghost">${ic('pause')}</button><button class="btn sm ghost">${ic('trash')}</button></div></div>
+  <div class="overall"><div class="bar thick"><i style="width:46%"></i></div><span class="pct">46%</span></div>
+  <div class="list">
+    <div class="item">
+      <div class="top"><span class="ic">${ic('down')}</span><span class="ic">${ic('list')}</span><span class="nm">Studio Sessions Vol. 3</span><span class="pill">MP3</span><span class="st">3 / 8</span></div>
+      <div class="bot"><div class="bar"><i style="width:41%"></i></div><span>41%</span></div>
+      <div class="kids">
+        <div class="kid done">${ic('check')}<span class="nm">01 Opening Theme</span><span class="st">done</span></div>
+        <div class="kid done">${ic('check')}<span class="nm">02 Late Hours</span><span class="st">done</span></div>
+        <div class="kid">${ic('dl')}<span class="nm">04 Night Drive</span><span class="st">62%</span></div>
+        ${compact ? '' : `<div class="kid">${ic('clock')}<span class="nm">05 Afterglow</span><span class="st">queued</span></div>`}
+      </div>
+    </div>
+    <div class="item">
+      <div class="top"><span class="ic">${ic('film')}</span><span class="nm">Building a Hall-Effect Keyboard From Scratch</span><span class="pill">MP4 CONV</span></div>
+      <div class="bot"><div class="bar"><i style="width:34%"></i></div><span>Encoding NVENC 34%</span></div>
+    </div>
+    <div class="item">
+      <div class="top"><span class="ic">${ic('dl')}</span><span class="nm">Desk Setup Tour 2026</span><span class="st">1080p</span></div>
+      <div class="bot"><div class="bar"><i style="width:71%"></i></div><span>71% · 14.2 MB/s · 0:38</span></div>
+    </div>
+    <div class="item warn">
+      <div class="top"><span class="ic">${ic('alert')}</span><span class="nm">Color Grading in 10 Minutes</span><span class="st">Eagle is closed</span></div>
+    </div>
+    ${compact ? '' : `<div class="item done"><div class="top"><span class="ic">${ic('check')}</span><span class="nm">Mic Shootout: SM7B vs RE20</span><span class="st">in Eagle</span></div></div>`}
+  </div>`;
+
+document.getElementById('root').innerHTML = variants.map((v, n) => `
+  <section class="variant">
+    <div class="variant-head"><span class="num">0${n + 1}</span><h2>${v.name}</h2><span class="desc">${v.desc}</span></div>
+    <div class="scroll"><div class="win ${v.cls}">
+      <div class="titlebar"><span class="mark">${ic('logo')}</span><span class="name">Hermes</span><span class="ver">0.3.2</span>
+        <div class="wc"><div>${ic('min')}</div><div>${ic('max')}</div><div>${ic('x')}</div></div></div>
+      <div class="body ${v.layout}">
+        ${sidebar(v.side)}
+        <div class="main">
+          ${v.layout === 'split'
+            ? `<div class="col">${form()}</div><div class="queue-col">${queue(false)}</div>`
+            : `<div class="col">${form()}${queue(true)}</div>`}
+        </div>
+      </div>
+    </div></div>
+  </section>`).join('');
+</script>
+</body>
+</html>

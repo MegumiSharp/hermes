@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hermes</title>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <div class="titlebar" data-tauri-drag-region>
+      <span class="mark" id="mark"></span>
+      <span class="name" data-tauri-drag-region>Hermes</span>
+      <span class="ver" id="ver" data-tauri-drag-region></span>
+      <div class="wc">
+        <button id="wc-min" title="Minimize"></button>
+        <button id="wc-max" title="Maximize"></button>
+        <button id="wc-close" class="close" title="Close"></button>
+      </div>
+    </div>
+    <div class="body">
+      <nav class="side" id="side"></nav>
+      <main class="content">
+        <div id="banners"></div>
+        <div id="view"></div>
+      </main>
+    </div>
+  </body>
+</html>
