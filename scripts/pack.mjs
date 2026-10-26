@@ -4,7 +4,7 @@
 // Downloads are cached in vendor/<id>/ and refreshed when a newer release exists.
 import { execFileSync } from "node:child_process";
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, sep } from "node:path";
 
 const tools = JSON.parse(readFileSync("src-tauri/binaries.json", "utf8"));
 const headers = { "User-Agent": "Hermes-build" };
@@ -23,12 +23,18 @@ function find(dir, name) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, e.name);
     if (e.isDirectory()) { const f = find(p, name); if (f) return f; }
-    else if (e.name === name) return p;
+    else if (p.endsWith(sep + name.replaceAll("/", sep))) return p; // name may be "models/x.bin"
   }
 }
 
 async function fetchTool(t) {
   const dir = join("vendor", t.id);
+  if (t.local) {
+    // built alongside the app (DirectML.dll from the ort build): no release to fetch
+    mkdirSync(dir, { recursive: true });
+    copyFileSync(t.local, join(dir, t.files[0]));
+    return { version: "bundled", date: statSync(t.local).mtime.toISOString() };
+  }
   const cached = existsSync(join(dir, "version.json")) && JSON.parse(readFileSync(join(dir, "version.json"), "utf8"));
   const res = await fetch(t.api, { headers: t.api.includes("api.github.com") ? headers : { "User-Agent": "Hermes-build" } });
   if (!res.ok) {
@@ -61,8 +67,11 @@ async function fetchTool(t) {
   if (asset.name.endsWith(".zip")) {
     const x = join(dir, "x");
     mkdirSync(x);
-    execFileSync("tar", ["-xf", file, "-C", x]);
-    for (const f of t.files) copyFileSync(find(x, f), join(dir, f));
+    execFileSync(join(process.env.SystemRoot, "System32", "tar.exe"), ["-xf", file, "-C", x]); // Windows bsdtar; Git's tar can't read zip
+    for (const f of t.files) {
+      mkdirSync(dirname(join(dir, f)), { recursive: true });
+      copyFileSync(find(x, f), join(dir, f));
+    }
     rmSync(x, { recursive: true });
     rmSync(file);
   }

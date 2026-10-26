@@ -2,9 +2,21 @@
 
 export type Site = { name: string; domain: string; login: string[]; url: string };
 
+/** Keys match yt-dlp's site and gallery-dl's extractor category. */
 export const SITES: Record<string, Site> = {
   youtube: { name: "YouTube", domain: "youtube.com", login: ["SAPISID", "__Secure-3PSID", "LOGIN_INFO"], url: "https://www.youtube.com" },
+  instagram: { name: "Instagram", domain: "instagram.com", login: ["sessionid"], url: "https://www.instagram.com" },
+  twitter: { name: "X (Twitter)", domain: "x.com", login: ["auth_token"], url: "https://x.com" },
+  pixiv: { name: "Pixiv", domain: "pixiv.net", login: ["PHPSESSID"], url: "https://www.pixiv.net" },
+  reddit: { name: "Reddit", domain: "reddit.com", login: ["reddit_session", "token_v2"], url: "https://www.reddit.com" },
 };
+
+/** Site key whose domain the URL's host belongs to ("" if none). */
+export function siteForUrl(url: string): string {
+  let host = "";
+  try { host = new URL(url).hostname; } catch { return ""; }
+  return Object.keys(SITES).find((k) => host === SITES[k].domain || host.endsWith(`.${SITES[k].domain}`)) ?? "";
+}
 
 export type CookieCheck = { ok: boolean; count: number; signedIn: boolean; expires: number | null; error?: string };
 

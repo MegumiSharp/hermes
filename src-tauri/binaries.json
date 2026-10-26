@@ -25,5 +25,32 @@
     "files": ["ffmpeg.exe", "ffprobe.exe"],
     "verify": ["-version"],
     "notify": false
+  },
+  {
+    "id": "realesrgan",
+    "name": "Real-ESRGAN",
+    "api": "https://api.github.com/repos/xinntao/Real-ESRGAN/releases/tags/v0.2.5.0",
+    "asset": "realesrgan-ncnn-vulkan-*-windows.zip",
+    "files": [
+      "realesrgan-ncnn-vulkan.exe", "vcomp140.dll",
+      "models/realesrgan-x4plus.bin", "models/realesrgan-x4plus.param",
+      "models/realesrgan-x4plus-anime.bin", "models/realesrgan-x4plus-anime.param",
+      "models/realesr-animevideov3-x2.bin", "models/realesr-animevideov3-x2.param",
+      "models/realesr-animevideov3-x3.bin", "models/realesr-animevideov3-x3.param",
+      "models/realesr-animevideov3-x4.bin", "models/realesr-animevideov3-x4.param"
+    ],
+    "verify": ["-h"],
+    "verifyText": "Usage",
+    "notify": false
+  },
+  {
+    "id": "directml",
+    "name": "DirectML runtime",
+    "api": "",
+    "local": "src-tauri/target/release/DirectML.dll",
+    "asset": "",
+    "files": ["DirectML.dll"],
+    "verify": [],
+    "notify": false
   }
 ]

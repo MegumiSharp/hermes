@@ -1,7 +1,7 @@
 # Hermes — Specification
 
 Portable Windows toolbox for a content creator. One exe, no installer, dark minimal UI.
-Status: pre-development. Work proceeds in tranches (section 9).
+Status: all tranches T0–T7 implemented. Manual checklist: `docs/TEST-TODO.md`.
 
 ---
 
@@ -144,7 +144,10 @@ hermes-data/
 - Manual selection: checkbox per item in the grid, select all/none.
 - Filters compile to `--filter` expressions plus native flags; the grid shows what will be downloaded.
 - Cookies via shared Cookies service (many sites require login).
-- Gallery = one expandable queue group. Eagle import with author + source URL tags.
+- A gallery is one queue item (one gallery-dl run) showing "files done / total"; Eagle import with author + source URL tags.
+- Implementation: filters and manual picks are resolved in the preview, then passed to gallery-dl as an
+  `image-filter` on `filename.extension` in a per-job config file. Files with identical names inside one URL are
+  picked/skipped together.
 
 ## 7. Background Removal (rembg models)
 
@@ -160,7 +163,9 @@ hermes-data/
   each with inference time; click one to open it in the before/after slider and keep it
   (only the kept result goes to Eagle). Helps choose the right model per situation.
 - Input: drag & drop images or folder, or paste. Batch through the queue.
-- Output: PNG with alpha. Options: alpha matting refine, background color/transparent, crop to subject.
+- Output: PNG with alpha. Options: background color/transparent, crop to subject. (Alpha matting refine: not
+  implemented; BiRefNet edges rarely need it.)
+- With Eagle on, results are kept in `hermes-data/results` (cleaned after 7 days) so the slider still works after import.
 - **Before/after slider** on each result (drag handle) when processing finishes.
 - Always sends to Eagle (checkbox default ON, same Eagle rules).
 
@@ -169,9 +174,9 @@ hermes-data/
 - Engine: `realesrgan-ncnn-vulkan` (Vulkan GPU).
 - Models: realesrgan-x4plus (photo), x4plus-anime, animevideov3 (video). Scale 2x / 3x / 4x.
 - Images: direct, batch through queue, before/after slider, Eagle.
-- Video: ffmpeg extracts frames → upscale → reassemble with NVENC + original audio.
-  Processed in chunks to cap temp disk usage; progress shows frames done / total and ETA.
-  Limitation: slow (minutes per minute of 1080p video) and disk-heavy.
+- Video: ffmpeg extracts frames → upscale → reassemble with NVENC + original audio → temp frames deleted.
+  Frames are JPEG (q2) to limit disk use; the whole clip is extracted at once (no chunking yet).
+  Limitation: slow (minutes per minute of 1080p video) and disk-heavy (a few GB per minute).
 
 ## 9. Delivery tranches
 

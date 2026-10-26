@@ -3,6 +3,7 @@ mod cookies;
 mod eagle;
 mod net;
 mod queue;
+mod rembg;
 mod update;
 
 use serde::{de::DeserializeOwned, Serialize};
@@ -62,6 +63,77 @@ fn save_settings(settings: Value) -> Result<(), String> {
     Ok(())
 }
 
+/// Folders modules need: `{ data, bin, results }`.
+#[tauri::command]
+fn module_paths() -> Value {
+    serde_json::json!({
+        "data": data_dir(), "bin": binaries::bin_dir(), "results": rembg::results_dir(),
+    })
+}
+
+/// Writes a per-job file (e.g. a gallery-dl filter config) to hermes-data/jobs; returns its path.
+/// Kept until the queue no longer needs it; the folder is small text files only.
+#[tauri::command]
+fn write_job_file(name: String, text: String) -> Result<String, String> {
+    if name.contains(['/', '\\']) || name.contains("..") {
+        return Err("invalid file name".into());
+    }
+    let dir = data_dir().join("jobs");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(name);
+    fs::write(&path, text).map_err(|e| e.to_string())?;
+    Ok(path.display().to_string())
+}
+
+/// Copies a result to a user folder ("Keep" in compare mode); creates the folder.
+#[tauri::command]
+fn copy_file(from: String, to: String) -> Result<(), String> {
+    if let Some(dir) = Path::new(&to).parent() {
+        fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    fs::copy(&from, &to).map(|_| ()).map_err(|e| e.to_string())
+}
+
+/// Creates folders a job's tools expect to exist (ffmpeg won't create its output folder).
+#[tauri::command]
+fn make_dirs(paths: Vec<String>) -> Result<(), String> {
+    paths.iter().try_for_each(|p| fs::create_dir_all(p).map_err(|e| e.to_string()))
+}
+
+/// Stores a file dropped onto the window (HTML5 drop gives bytes, not paths) in hermes-data/uploads.
+/// Raw body = file bytes, header `x-name` = original file name. Returns the saved path.
+#[tauri::command]
+fn save_upload(request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else { return Err("expected raw bytes".into()) };
+    let name = request.headers().get("x-name").and_then(|v| v.to_str().ok()).unwrap_or("upload");
+    let name = urlencoding_decode(name);
+    let safe: String = name.chars().map(|c| if r#"\/:*?"<>|"#.contains(c) { '_' } else { c }).collect();
+    let dir = data_dir().join("uploads");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("{}-{safe}", now_ms()));
+    fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path.display().to_string())
+}
+
+/// Header values are ASCII; the frontend sends the name with encodeURIComponent.
+fn urlencoding_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     update::cleanup_old_exe();
@@ -69,6 +141,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            rembg::cleanup_results();
             queue::start(app.handle().clone());
             Ok(())
         })
@@ -92,6 +165,15 @@ pub fn run() {
             queue::queue_pause_all,
             queue::queue_clear_finished,
             queue::queue_resume_now,
+            rembg::rembg_models,
+            rembg::rembg_download,
+            rembg::rembg_delete,
+            rembg::rembg_compare,
+            module_paths,
+            write_job_file,
+            save_upload,
+            copy_file,
+            make_dirs,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

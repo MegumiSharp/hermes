@@ -24,9 +24,20 @@ struct Tool {
     name: String,
     api: String,
     asset: String, // exact name or pattern with `*`
-    files: Vec<String>,
+    files: Vec<String>, // relative to bin/, may contain a subfolder ("models/x.bin")
     verify: Vec<String>,
+    /// Tools whose help exits non-zero (Real-ESRGAN): verified by this text in their output.
+    #[serde(default, rename = "verifyText")]
+    verify_text: String,
     notify: bool,
+}
+
+/// Windows' bsdtar (extracts zip). Git's GNU tar can come first on PATH and can't.
+fn tar() -> std::process::Command {
+    let root = std::env::var_os("SystemRoot").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+    let mut c = std::process::Command::new(root.join(r"System32\tar.exe"));
+    c.creation_flags(NO_WINDOW);
+    c
 }
 
 static TOOLS: LazyLock<Vec<Tool>> =
@@ -135,6 +146,9 @@ fn payload() -> Option<Payload> {
 /// is renamed to .old first (deleted now if possible, otherwise on next start).
 fn install_file(src: &Path, name: &str) -> io::Result<()> {
     let dest = bin_dir().join(name);
+    if let Some(dir) = dest.parent() {
+        fs::create_dir_all(dir)?;
+    }
     let old = dest.with_extension("old");
     fs::remove_file(&old).ok();
     if dest.exists() {
@@ -153,7 +167,7 @@ fn extract(t: &Tool, p: &Payload) -> Result<(), String> {
     let mut exe = File::open(std::env::current_exe().map_err(err)?).map_err(err)?;
     for name in &t.files {
         let e = p.files.iter().find(|e| &e.name == name).ok_or(format!("{name} not in payload"))?;
-        let tmp = bin_dir().join(format!("{name}.tmp"));
+        let tmp = bin_dir().join(format!("{}.tmp", name.replace('/', "_")));
         exe.seek(SeekFrom::Start(e.offset)).map_err(err)?;
         io::copy(&mut (&mut exe).take(e.size), &mut File::create(&tmp).map_err(err)?).map_err(err)?;
         install_file(&tmp, name).map_err(err)?;
@@ -167,11 +181,17 @@ fn verify(t: &Tool) -> Result<String, String> {
     if !t.files.iter().all(|f| bin_dir().join(f).exists()) {
         return Err("Not installed".into());
     }
+    if t.verify.is_empty() {
+        // libraries (DirectML.dll): nothing to run, check it is a PE file
+        return if net::is_exe(&exe) { Ok(String::new()) } else { Err("Corrupt file".into()) };
+    }
     let out = std::process::Command::new(&exe).args(&t.verify).creation_flags(NO_WINDOW).output().map_err(err)?;
-    if !out.status.success() {
+    let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+    let ok = if t.verify_text.is_empty() { out.status.success() } else { text.contains(&t.verify_text) };
+    if !ok {
         return Err(format!("{} exited with {}", t.files[0], out.status));
     }
-    Ok(String::from_utf8_lossy(&out.stdout).lines().next().unwrap_or_default().to_string())
+    Ok(text.lines().next().unwrap_or_default().to_string())
 }
 
 fn status(t: &Tool, check: Result<String, String>) -> Status {
@@ -260,6 +280,9 @@ fn natural(s: &str) -> Vec<u64> {
 
 /// Latest release asset for a tool: (version info, asset name, url).
 async fn latest(t: &Tool) -> Result<(Ver, String, String), String> {
+    if t.api.is_empty() {
+        return Err("ships with Hermes".into()); // built-in component, updated with the app
+    }
     let rel = net::latest_release(&t.api).await?.ok_or("no release")?;
     let (cap, name, url) = rel
         .assets
@@ -286,7 +309,7 @@ pub struct Latest {
 #[tauri::command]
 pub async fn binaries_latest() -> Latest {
     let mut out = Latest { versions: HashMap::new(), errors: vec![] };
-    for t in TOOLS.iter() {
+    for t in TOOLS.iter().filter(|t| !t.api.is_empty()) {
         match latest(t).await {
             Ok((v, ..)) => drop(out.versions.insert(t.id.clone(), v)),
             Err(e) => out.errors.push(format!("{}: {e}", t.name)),
@@ -311,15 +334,7 @@ pub async fn binary_update(app: AppHandle, id: String) -> Result<Status, String>
 
     let result = (|| {
         let sources: Vec<PathBuf> = if asset.ends_with(".zip") {
-            let ok = std::process::Command::new("tar")
-                .arg("-xf")
-                .arg(&file)
-                .arg("-C")
-                .arg(&tmp)
-                .creation_flags(NO_WINDOW)
-                .status()
-                .map_err(err)?
-                .success();
+            let ok = tar().arg("-xf").arg(&file).arg("-C").arg(&tmp).status().map_err(err)?.success();
             if !ok {
                 return Err("Could not extract the archive".to_string());
             }
@@ -327,7 +342,8 @@ pub async fn binary_update(app: AppHandle, id: String) -> Result<Status, String>
         } else {
             vec![file.clone()]
         };
-        if !sources.iter().all(|s| net::is_exe(s)) {
+        let exes = sources.iter().zip(&t.files).filter(|(_, n)| n.ends_with(".exe") || n.ends_with(".dll"));
+        if !exes.into_iter().all(|(s, _)| net::is_exe(s)) {
             return Err("Downloaded file is not an exe".into());
         }
         for (src, name) in sources.iter().zip(&t.files) {
@@ -340,14 +356,15 @@ pub async fn binary_update(app: AppHandle, id: String) -> Result<Status, String>
     Ok(status(t, verify(t)))
 }
 
-fn find(dir: &Path, name: &str) -> Option<PathBuf> {
+/// Finds `rel` ("ffmpeg.exe" or "models/x.bin") anywhere under `dir` (archives nest a top folder).
+fn find(dir: &Path, rel: &str) -> Option<PathBuf> {
     for e in fs::read_dir(dir).ok()?.flatten() {
         let p = e.path();
         if p.is_dir() {
-            if let Some(f) = find(&p, name) {
+            if let Some(f) = find(&p, rel) {
                 return Some(f);
             }
-        } else if p.file_name().is_some_and(|n| n == name) {
+        } else if p.ends_with(rel) {
             return Some(p);
         }
     }

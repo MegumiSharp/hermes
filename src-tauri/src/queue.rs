@@ -39,6 +39,11 @@ pub enum Parser {
     Ffmpeg,
     /// Any tool: last line becomes the detail; `[file] <path>` lines are outputs.
     Plain,
+    /// gallery-dl: each printed absolute path is a downloaded file, "# <path>" a skipped one.
+    /// The step's `duration` holds the expected file count for the progress bar.
+    GalleryDl,
+    /// Tools printing "42.50%" / "42,50%" lines (Real-ESRGAN).
+    Percent,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -60,8 +65,25 @@ pub enum Step {
         #[serde(default)]
         replace: bool,
     },
-    /// Import every output so far into Eagle, then delete it from disk.
-    Eagle,
+    /// Import every output so far into Eagle, then delete it from disk (unless `keep`: modules that
+    /// show a before/after preview keep their result in hermes-data/results).
+    Eagle {
+        #[serde(default)]
+        keep: bool,
+    },
+    /// Delete files/folders (temp frames of a video upscale). Placeholders allowed.
+    Delete { paths: Vec<String> },
+    /// Background removal with an ONNX model (src-tauri/src/rembg.rs).
+    #[serde(rename_all = "camelCase")]
+    Rembg {
+        model: String,
+        input: String,
+        output: String,
+        #[serde(default)]
+        background: String, // "" = transparent, else "#rrggbb"
+        #[serde(default)]
+        crop: bool,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -93,6 +115,9 @@ pub struct Job {
     eagle: eagle::Meta,
     #[serde(default)]
     in_eagle: bool,
+    /// Original input file, for before/after previews (Background Removal, Upscale).
+    #[serde(default)]
+    source: String,
 }
 
 /// What a module submits. A job with `children` becomes an expandable group (it never runs itself).
@@ -109,6 +134,11 @@ pub struct NewJob {
     eagle: eagle::Meta,
     #[serde(default)]
     children: Vec<NewJob>,
+    /// Files that already exist (e.g. a kept compare result that only needs the Eagle step).
+    #[serde(default)]
+    outputs: Vec<String>,
+    #[serde(default)]
+    source: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
@@ -276,6 +306,9 @@ async fn run(id: String) {
         let result = match step {
             Step::Run { label, bin, args, parser, outputs, duration, replace } => {
                 replace_outputs = replace;
+                // one GPU upscale at a time (rembg serialises on its own session lock)
+                static GPU: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+                let _gpu = if bin.starts_with("realesrgan") { Some(GPU.lock().await) } else { None };
                 let last = job.outputs.last().cloned().unwrap_or_default();
                 let fill = |s: &String| fill_placeholders(s, &last);
                 let args: Vec<String> = args.iter().map(fill).collect();
@@ -285,7 +318,18 @@ async fn run(id: String) {
                     found
                 })
             }
-            Step::Eagle => eagle_step(&job).await.map(|_| vec![]),
+            Step::Eagle { keep } => eagle_step(&job, keep).await.map(|_| vec![]),
+            Step::Delete { paths } => {
+                let last = job.outputs.last().cloned().unwrap_or_default();
+                for p in paths.iter().map(|p| PathBuf::from(fill_placeholders(p, &last))) {
+                    if p.is_dir() { std::fs::remove_dir_all(&p).ok(); } else { std::fs::remove_file(&p).ok(); }
+                }
+                Ok(vec![])
+            }
+            Step::Rembg { model, input, output, background, crop } => {
+                tick(&id, 0.0, "Removing background".into());
+                crate::rembg::remove(&model, &input, &output, &background, crop).await.map(|_| vec![output]).map_err(Stop::Failed)
+            }
         };
         let ok = with(|q| {
             let rate_limited = matches!(result, Err(Stop::RateLimited));
@@ -298,7 +342,7 @@ async fn run(id: String) {
                         j.outputs.clear();
                     }
                     j.outputs.extend(found);
-                    j.in_eagle |= matches!(j.steps[j.step], Step::Eagle);
+                    j.in_eagle |= matches!(j.steps[j.step], Step::Eagle { .. });
                     j.step += 1;
                     j.progress = 0.0;
                     return true;
@@ -373,6 +417,7 @@ async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], parser: Par
     let mut last_line = String::new(); // fallback for tools without an ERROR prefix (ffmpeg)
     let mut rate_limited = false;
     let mut last_tick = 0;
+    let mut count = 0u32; // GalleryDl files seen
     tick(id, 0.0, label.into());
 
     while !(out_done && err_done) {
@@ -387,11 +432,14 @@ async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], parser: Par
             files.push(f.to_string());
             continue;
         }
-        if line.contains("HTTP Error 429") || line.contains("Sign in to confirm you") || line.contains("rate-limit") {
+        let lower = line.to_lowercase();
+        if ["http error 429", "429 too many requests", "sign in to confirm you", "rate-limit", "rate limit"].iter().any(|s| lower.contains(s)) {
             rate_limited = true;
         }
         if let Some(e) = line.strip_prefix("ERROR: ") {
             error_line = e.to_string();
+        } else if let Some((_, e)) = line.split_once("][error] ") {
+            error_line = e.to_string(); // gallery-dl: "[download][error] Failed to download ..."
         } else if !line.is_empty() && !line.starts_with("[hermes]") && !line.contains('=') {
             last_line = line.to_string();
         }
@@ -402,15 +450,35 @@ async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], parser: Par
                 let total = if total.is_nan() { est } else { total };
                 let pct = if total > 0.0 { done / total } else { 0.0 };
                 let mut d = format!("{label} {:.0}%", pct * 100.0);
-                if speed.is_finite() { d += &format!(" Â· {}/s", human_bytes(speed)) }
-                if eta.is_finite() { d += &format!(" Â· {}", clock(eta)) }
+                if speed.is_finite() { d += &format!(" · {}/s", human_bytes(speed)) }
+                if eta.is_finite() { d += &format!(" · {}", clock(eta)) }
                 Some((pct, d))
             }),
             Parser::Ffmpeg => line.strip_prefix("out_time_us=").and_then(|us| {
                 let pct = (us.parse::<f64>().ok()? / 1e6 / duration.max(0.001)).clamp(0.0, 1.0);
                 Some((pct, format!("{label} {:.0}%", pct * 100.0)))
             }),
-            Parser::Plain => (!line.is_empty()).then(|| (0.0, format!("{label} Â· {line}"))),
+            Parser::Plain => (!line.is_empty()).then(|| (0.0, format!("{label} · {line}"))),
+            Parser::GalleryDl => {
+                let skipped = line.strip_prefix("# ");
+                let path = skipped.unwrap_or(line);
+                let b = path.as_bytes();
+                let is_path = b.len() > 3 && b[1] == b':' && b[2] == b'\\';
+                // A skipped file still on disk came from an earlier interrupted run and still needs
+                // its Eagle import; skipped files already imported were deleted, so they don't count.
+                if is_path && (skipped.is_none() || std::path::Path::new(path).exists()) {
+                    files.push(path.to_string());
+                }
+                is_path.then(|| {
+                    count += 1;
+                    let total = duration.max(count as f64);
+                    (count as f64 / total, format!("{label} {count} / {total:.0}"))
+                })
+            }
+            Parser::Percent => line
+                .strip_suffix('%')
+                .and_then(|n| n.trim().replace(',', ".").parse::<f64>().ok())
+                .map(|p| (p / 100.0, format!("{label} {p:.0}%"))),
         };
         if let Some((pct, detail)) = update {
             if now_ms() - last_tick > 200 {
@@ -437,7 +505,7 @@ async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], parser: Par
     }
 }
 
-async fn eagle_step(job: &Job) -> Result<(), Stop> {
+async fn eagle_step(job: &Job, keep: bool) -> Result<(), Stop> {
     if !eagle::online().await {
         return Err(Stop::EagleOffline);
     }
@@ -448,7 +516,9 @@ async fn eagle_step(job: &Job) -> Result<(), Stop> {
     for (i, f) in files.iter().enumerate() {
         tick(&job.id, i as f64 / files.len() as f64, "Importing to Eagle".into());
         eagle::add(f, &job.eagle).await.map_err(Stop::Failed)?;
-        std::fs::remove_file(f).ok();
+        if !keep {
+            std::fs::remove_file(f).ok();
+        }
     }
     Ok(())
 }
@@ -479,9 +549,10 @@ pub fn queue_add(jobs: Vec<NewJob>) -> Vec<String> {
             progress: 0.0,
             detail: String::new(),
             error: String::new(),
-            outputs: vec![],
+            outputs: n.outputs,
             eagle: n.eagle,
             in_eagle: false,
+            source: n.source,
         });
         for c in n.children {
             make(c, Some(id.clone()), out);

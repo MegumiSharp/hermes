@@ -6,17 +6,29 @@ import { banner, h } from "./core";
 import { icon, IconName } from "./icons";
 
 export type Step =
-  | { type: "run"; label: string; bin: string; args: string[]; parser: "ytDlp" | "ffmpeg" | "plain"; outputs?: string[]; duration?: number; replace?: boolean }
-  | { type: "eagle" };
+  | { type: "run"; label: string; bin: string; args: string[]; parser: "ytDlp" | "ffmpeg" | "plain" | "galleryDl" | "percent"; outputs?: string[]; duration?: number; replace?: boolean }
+  | { type: "eagle"; keep?: boolean }
+  | { type: "delete"; paths: string[] }
+  | { type: "rembg"; model: string; input: string; output: string; background?: string; crop?: boolean };
 export type EagleMeta = { website?: string; tags?: string[]; annotation?: string };
-export type NewJob = { module: string; title: string; pill?: string; steps?: Step[]; eagle?: EagleMeta; children?: NewJob[] };
+export type NewJob = {
+  module: string; title: string; pill?: string; steps?: Step[]; eagle?: EagleMeta; children?: NewJob[];
+  outputs?: string[]; source?: string;
+};
 
 type State = "queued" | "running" | "paused" | "waitingEagle" | "done" | "failed";
-type Job = {
+export type Job = {
   id: string; module: string; title: string; pill: string; parent: string | null; group: boolean;
   steps: Step[]; step: number; state: State; progress: number; detail: string; error: string;
-  outputs: string[]; inEagle: boolean;
+  outputs: string[]; inEagle: boolean; source: string;
 };
+
+/** Calls `fn(jobs)` now and on every queue change; stops when `alive()` turns false. */
+export function watchJobs(fn: (jobs: Job[]) => void, alive: () => boolean) {
+  const v = { full: () => (alive() ? fn(queue.jobs) : views.delete(v)), light: () => {} };
+  views.add(v);
+  fn(queue.jobs);
+}
 type Queue = { jobs: Job[]; pausedUntil: number; backoffMin: number; pausedAll: boolean };
 
 let queue: Queue = await invoke("queue_get");

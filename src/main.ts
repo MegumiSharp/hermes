@@ -8,8 +8,10 @@ import { icon, IconName } from "./icons";
 import { h, settings, saveSettings } from "./core";
 import { checkForUpdate, startUpdateChecks } from "./update";
 import { renderBinaries, startBinaryChecks } from "./binaries";
-import { mountQueue } from "./queue";
 import { renderVideo } from "./modules/video";
+import { renderGallery } from "./modules/gallery";
+import { renderRembg } from "./modules/rembg";
+import { renderUpscale } from "./modules/upscale";
 
 type Module = {
   id: string;
@@ -19,19 +21,12 @@ type Module = {
   render(view: HTMLElement): void;
 };
 
-// Placeholder until the module's tranche lands; already shows that module's queue.
-const soon = (id: string, title: string, tranche: string) => (view: HTMLElement) => {
-  const page = h(`<div class="page"><div class="head"><div><h3>${title}</h3><div class="sub">Arrives in tranche ${tranche}.</div></div></div></div>`);
-  mountQueue(page, id);
-  view.append(page);
-};
-
 // Module registry: the only place that knows about every module.
 const modules: Module[] = [
   { id: "video", name: "Video Downloader", icon: "download", section: "tools", render: renderVideo },
-  { id: "gallery", name: "Gallery Downloader", icon: "image", section: "tools", render: soon("gallery", "Gallery Downloader", "T5") },
-  { id: "rembg", name: "Background Removal", icon: "scissors", section: "tools", render: soon("rembg", "Background Removal", "T6") },
-  { id: "upscale", name: "Upscale", icon: "maximize", section: "tools", render: soon("upscale", "Upscale", "T7") },
+  { id: "gallery", name: "Gallery Downloader", icon: "image", section: "tools", render: renderGallery },
+  { id: "rembg", name: "Background Removal", icon: "scissors", section: "tools", render: renderRembg },
+  { id: "upscale", name: "Upscale", icon: "maximize", section: "tools", render: renderUpscale },
   { id: "binaries", name: "Binaries", icon: "layers", section: "system", render: renderBinaries },
   { id: "settings", name: "Settings", icon: "sliders", section: "system", render: renderSettings },
 ];
