@@ -8,7 +8,7 @@ import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
 
 export const OUT = resolve("test-output");
-const DEFAULT_EXE = resolve("src-tauri/target/release/Hermes.exe");
+const DEFAULT_EXE = resolve("release/Hermes.exe");
 
 /** Starts the exe with a DevTools port and returns { page, proc, errors, close }. */
 export async function launch(exe = DEFAULT_EXE, port = 9333) {

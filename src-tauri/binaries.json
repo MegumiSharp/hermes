@@ -1,0 +1,29 @@
+[
+  {
+    "id": "yt-dlp",
+    "name": "yt-dlp",
+    "api": "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
+    "asset": "yt-dlp.exe",
+    "files": ["yt-dlp.exe"],
+    "verify": ["--version"],
+    "notify": true
+  },
+  {
+    "id": "gallery-dl",
+    "name": "gallery-dl",
+    "api": "https://codeberg.org/api/v1/repos/mikf/gallery-dl/releases/latest",
+    "asset": "gallery-dl.exe",
+    "files": ["gallery-dl.exe"],
+    "verify": ["--version"],
+    "notify": true
+  },
+  {
+    "id": "ffmpeg",
+    "name": "FFmpeg",
+    "api": "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest",
+    "asset": "ffmpeg-n*-latest-win64-gpl-*.zip",
+    "files": ["ffmpeg.exe", "ffprobe.exe"],
+    "verify": ["-version"],
+    "notify": false
+  }
+]

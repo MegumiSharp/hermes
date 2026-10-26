@@ -10,6 +10,9 @@ export function saveSettings(patch: Record<string, any>) {
   return invoke("save_settings", { settings });
 }
 
+/** Switches the sidebar module (main.ts listens), usable from banners without importing main. */
+export const navigate = (id: string) => window.dispatchEvent(new CustomEvent("hermes:open", { detail: id }));
+
 // ---------- tiny DOM helper ----------
 export function h(html: string): HTMLElement {
   const t = document.createElement("template");

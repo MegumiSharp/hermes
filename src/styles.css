@@ -75,10 +75,54 @@ svg.i { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-widt
 .bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: inherit; transition: width .15s; }
 .progress { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
 
-.empty { margin: auto; text-align: center; color: var(--muted); }
-.empty svg { width: 28px; height: 28px; stroke-width: 1.5; }
-.empty h3 { color: var(--text); font-size: 15px; font-weight: 600; margin: 10px 0 4px; }
-.empty p { margin: 0; }
+.sub { color: var(--muted); font-size: 12px; }
+.head .right { margin-left: auto; display: flex; gap: 8px; }
+
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 999px; font: 11px var(--mono); color: var(--muted); white-space: nowrap; }
+.chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+.chip.bad .dot { background: var(--danger); }
+.pill { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line); letter-spacing: .03em; white-space: nowrap; text-transform: uppercase; }
+
+.switch { appearance: none; width: 32px; height: 18px; border-radius: 999px; background: var(--track); position: relative; cursor: pointer; flex: none; transition: background .15s; margin: 0; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: transform .15s, background .15s; }
+.switch:checked { background: var(--accent); }
+.switch:checked::after { transform: translateX(14px); background: var(--accent-fg); }
+label.row { cursor: pointer; }
+
+/* binaries page */
+#bin-list .row > .bin-name { flex: 1.2; }
+#bin-list .row > .bin-state { flex: .8; }
+#bin-list .row > .bin-latest { flex: 1; }
+#bin-list .row > .bin-act { flex: 0 0 120px; display: flex; justify-content: flex-end; }
+#bin-list .bin-act .bar { width: 100%; }
+
+/* queue */
+.queue { display: flex; flex-direction: column; gap: 10px; }
+.qhead { display: flex; align-items: center; gap: 10px; }
+.qhead h4 { margin: 0; font-size: 14px; font-weight: 600; }
+.qhead .count { font: 12px var(--mono); color: var(--muted); }
+.qhead .count b { color: var(--text); font-weight: 500; }
+.qhead .right { margin-left: auto; display: flex; gap: 2px; }
+.overall { display: flex; align-items: center; gap: 10px; }
+.overall .bar { flex: 1; }
+.overall .pct { width: 36px; text-align: right; }
+.bar.thick { height: 6px; }
+.list { display: flex; flex-direction: column; gap: 6px; }
+.q-empty { color: var(--muted); padding: 18px; text-align: center; border: 1px dashed var(--border); border-radius: var(--r); }
+.item { border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); padding: 7px 8px 8px 11px; display: flex; flex-direction: column; gap: 6px; }
+.item .top { display: flex; align-items: center; gap: 9px; min-width: 0; min-height: 26px; }
+.item .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; min-width: 0; flex: 0 1 auto; }
+.item .st { margin-left: auto; font: 11px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
+.item .acts { display: flex; gap: 0; flex: none; }
+.item .acts .btn { padding: 0 6px; }
+.item .exp { padding: 0 2px; margin-left: -4px; }
+.item .ic { color: var(--muted); display: flex; }
+.item.done .ic { color: var(--ok); }
+.item.failed .ic, .item.failed .st { color: var(--danger); }
+.item.waitingEagle .ic, .item.waitingEagle .st { color: var(--warn); }
+.item.running .ic { color: var(--accent); }
+.kids { display: flex; flex-direction: column; gap: 4px; margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--border); }
+.kids .item { background: transparent; border-color: transparent; padding: 2px 0 4px; }
 
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: grid; place-items: center; z-index: 50; }
 .modal { width: min(520px, calc(100vw - 48px)); max-height: calc(100vh - 80px); display: flex; flex-direction: column; background: var(--menu); border: 1px solid var(--border); border-radius: calc(var(--r) + 4px); box-shadow: 0 24px 60px rgba(0,0,0,.6); }

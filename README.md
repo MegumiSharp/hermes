@@ -1,4 +1,4 @@
-﻿# Hermes
+# Hermes
 
 Portable Windows toolbox for content creators: video and gallery downloads, background removal, upscaling.
 Single exe, no installer. See [docs/SPEC.md](docs/SPEC.md).

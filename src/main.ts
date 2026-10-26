@@ -7,6 +7,8 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { icon, IconName } from "./icons";
 import { h, settings, saveSettings } from "./core";
 import { checkForUpdate, startUpdateChecks } from "./update";
+import { renderBinaries, startBinaryChecks } from "./binaries";
+import { mountQueue } from "./queue";
 
 type Module = {
   id: string;
@@ -16,17 +18,20 @@ type Module = {
   render(view: HTMLElement): void;
 };
 
-const soon = (title: string, tranche: string) => (view: HTMLElement) => {
-  view.append(h(`<div class="empty">${icon("layers")}<h3>${title}</h3><p>Arrives in tranche ${tranche}.</p></div>`));
+// Placeholder until the module's tranche lands; already shows that module's queue.
+const soon = (id: string, title: string, tranche: string) => (view: HTMLElement) => {
+  const page = h(`<div class="page"><div class="head"><div><h3>${title}</h3><div class="sub">Arrives in tranche ${tranche}.</div></div></div></div>`);
+  mountQueue(page, id);
+  view.append(page);
 };
 
 // Module registry: the only place that knows about every module.
 const modules: Module[] = [
-  { id: "video", name: "Video Downloader", icon: "download", section: "tools", render: soon("Video Downloader", "T4") },
-  { id: "gallery", name: "Gallery Downloader", icon: "image", section: "tools", render: soon("Gallery Downloader", "T5") },
-  { id: "rembg", name: "Background Removal", icon: "scissors", section: "tools", render: soon("Background Removal", "T6") },
-  { id: "upscale", name: "Upscale", icon: "maximize", section: "tools", render: soon("Upscale", "T7") },
-  { id: "binaries", name: "Binaries", icon: "layers", section: "system", render: soon("Binaries", "T3") },
+  { id: "video", name: "Video Downloader", icon: "download", section: "tools", render: soon("video", "Video Downloader", "T4") },
+  { id: "gallery", name: "Gallery Downloader", icon: "image", section: "tools", render: soon("gallery", "Gallery Downloader", "T5") },
+  { id: "rembg", name: "Background Removal", icon: "scissors", section: "tools", render: soon("rembg", "Background Removal", "T6") },
+  { id: "upscale", name: "Upscale", icon: "maximize", section: "tools", render: soon("upscale", "Upscale", "T7") },
+  { id: "binaries", name: "Binaries", icon: "layers", section: "system", render: renderBinaries },
   { id: "settings", name: "Settings", icon: "sliders", section: "system", render: renderSettings },
 ];
 
@@ -92,5 +97,7 @@ wc("wc-min", "minus", () => win.minimize());
 wc("wc-max", "square", () => win.toggleMaximize());
 wc("wc-close", "x", () => win.close());
 
+window.addEventListener("hermes:open", (e) => open((e as CustomEvent<string>).detail));
 open(settings.lastModule);
 startUpdateChecks();
+startBinaryChecks();

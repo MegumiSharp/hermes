@@ -60,7 +60,7 @@ hermes-data/
   version (GitHub Releases API) and an Update button with a progress bar. Hermes downloads the official
   release asset itself and swaps the file.
   - yt-dlp: `yt-dlp/yt-dlp` → `yt-dlp.exe`. Option "Update yt-dlp automatically on launch" (default ON).
-  - gallery-dl: `mikf/gallery-dl` → `gallery-dl.exe`.
+  - gallery-dl: Codeberg `mikf/gallery-dl` (moved off GitHub in 2026) → `gallery-dl.exe`.
   - ffmpeg: `BtbN/FFmpeg-Builds` → `ffmpeg-master-latest-win64-gpl.zip` (includes NVENC).
   - Real-ESRGAN: `xinntao/Real-ESRGAN` ncnn-vulkan build (unmaintained since 2022, stable; update check still shown).
 - Large AI models are **downloaded in-app** only after explicit user confirmation (modal with names and total
@@ -90,6 +90,8 @@ hermes-data/
 - Import `POST /api/item/addFromPath`, no folderId → **Uncategorized**.
 - Metadata: `website` = source URL, tags = channel/author name + source URL; `annotation` = title.
 - After successful import the file is **deleted from the output folder** (Eagle keeps its copy).
+  "Successful" = Eagle's item/info reports the item with the source's exact size; addFromPath alone
+  replies before the copy is done. Without confirmation the file is kept and the item fails.
 
 ### 4.4 Cookies
 - Per site (YouTube first, then gallery-dl sites). Mode: Auto / Firefox / Chrome / Edge / Brave / File / None.
