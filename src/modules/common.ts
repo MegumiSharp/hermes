@@ -142,5 +142,6 @@ export function resultsPanel(module: string): HTMLElement {
   return el;
 }
 
-export const fileName = (p: string) => p.split(/[\\/]/).pop() ?? p;
-export const stem = (p: string) => fileName(p).replace(/\.[^.]+$/, "").replace(/^\d{13}-/, ""); // drop upload prefix
+/** File name for display; drops the timestamp prefix `save_upload` adds to dropped files. */
+export const fileName = (p: string) => (p.split(/[\\/]/).pop() ?? p).replace(/^\d{13}-/, "");
+export const stem = (p: string) => fileName(p).replace(/\.[^.]+$/, "");

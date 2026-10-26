@@ -62,7 +62,13 @@ const { page } = app;
 await until(async () => (await invoke(page, "binaries_init")).every((s) => s.ok), "all binaries working", 120000);
 check(true, "all bundled tools (incl. Real-ESRGAN, DirectML) verify");
 
+// ONLY=rembg,upscale skips sections (e.g. when a site is rate limiting this IP)
+const only = (s) => !process.env.ONLY || process.env.ONLY.split(",").includes(s);
+let j; // last finished job
+let photo = resolve("test-output/fixtures/photo.jpg"); // replaced by a downloaded file when the gallery runs
+
 // ================= T5 Gallery =================
+if (only("gallery")) {
 await page.waitForSelector("#g-url");
 await page.fill("#g-url", GALLERY);
 await page.click("#g-fetch");
@@ -94,7 +100,7 @@ await tiles[0].click();
 check((await page.$$("#g-grid .tile.off")).length === 1, "clicking a tile deselects it");
 const want = total - 1;
 await page.click("#g-add");
-let j = await lastJobDone(page, "gallery");
+j = await lastJobDone(page, "gallery");
 const got = walk(G).filter((f) => /\.(jpe?g|png|gif|webp|svg|tiff?)$/i.test(f));
 check(got.length === want, `downloaded exactly the ${want} selected files (${got.length})`);
 check(j.outputs.length === want, "job lists every downloaded file");
@@ -120,14 +126,17 @@ const items = await until(async () => {
 check(items[0].url === GALLERY, "Eagle item keeps the gallery URL");
 await fetch(`${EAGLE}/item/moveToTrash`, { method: "POST", body: JSON.stringify({ itemIds: items.map((i) => i.id) }) });
 await page.click("#g-eagle + .box");
-const photo = got.find((f) => /\.jpe?g$/i.test(f)) ?? got[0];
+photo = got.find((f) => /\.jpe?g$/i.test(f)) ?? got[0];
+}
 
 // ================= T6 Background Removal =================
+if (only("rembg")) {
 await page.click('.nav[data-id="rembg"]');
 await page.waitForSelector("#r-go");
 let models = await invoke(page, "rembg_models");
 if (!models.some((m) => m.installed)) check(await page.isVisible("#r-none"), "no-model notice shown");
 await page.click("#r-models");
+await page.waitForSelector(".m-row"); // the modal opens after an async model listing
 for (const id of ["isnet-general-use", "u2net"]) {
   if (!models.find((m) => m.id === id).installed) await page.check(`.m-row input[data-id="${id}"]`);
 }
@@ -181,8 +190,10 @@ await page.waitForSelector(".modal .ba");
 await page.click(".modal .m-foot .btn.primary");
 await until(() => walk(R).some((f) => /-(isnet-general-use|u2net)\.png$/.test(f)), "kept compare result in folder", 10000);
 check(true, "Keep saves the chosen model's result");
+}
 
 // ================= T7 Upscale =================
+if (only("upscale")) {
 mkdirSync(U, { recursive: true });
 const small = join(W, "small.png");
 const clip = join(W, "clip.mp4");
@@ -214,6 +225,7 @@ check(vs.codec_name === "h264" && vs.width === 640 && vs.height === 360, `video 
 check(v.streams.some((s) => s.codec_type === "audio"), "original audio kept");
 check(!readdirSync(join(DATA, "temp")).some((d) => d.startsWith("upscale-")), "temporary frames deleted");
 await page.screenshot({ path: join(OUT, "t7-upscale.png") });
+}
 
 check(app.errors.length === 0, `no console errors ${app.errors.join(" | ")}`);
 await app.close();

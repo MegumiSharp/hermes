@@ -62,7 +62,8 @@ export function modal(o: { title: string; body: string | HTMLElement; actions?: 
   const esc = (e: KeyboardEvent) => e.key === "Escape" && close();
   el.querySelector("h3")!.textContent = o.title;
   el.querySelector(".m-head button")!.addEventListener("click", close);
-  el.onclick = (e) => e.target === el && close();
+  // block body: an onclick that returns false cancels the click (checkboxes inside would never toggle)
+  el.onclick = (e) => { if (e.target === el) close(); };
   el.querySelector(".m-body")!.append(o.body);
   el.querySelector(".m-foot")!.append(...buttons(o.actions ?? [{ label: "Close", primary: true }], close));
   document.addEventListener("keydown", esc);

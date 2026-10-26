@@ -21,6 +21,10 @@ export function modelsModal(): Promise<void> {
     const list = body.querySelector(".m-list")!;
     const total = body.querySelector(".m-total")!;
     const picked = new Set<string>();
+    const renderTotal = () => {
+      const mb = models.filter((m) => picked.has(m.id)).reduce((a, m) => a + m.mb, 0);
+      total.textContent = picked.size ? `${picked.size} selected · ${gb(mb)} to download` : "";
+    };
     const render = () => {
       list.replaceChildren(...models.map((m) => {
         const row = h(`<label class="m-row ${m.installed ? "installed" : ""}">
@@ -32,13 +36,12 @@ export function modelsModal(): Promise<void> {
         row.querySelector(".m-info .sub")!.textContent = m.installed ? `${m.useCase} · installed` : m.useCase;
         return row;
       }));
-      const mb = models.filter((m) => picked.has(m.id)).reduce((a, m) => a + m.mb, 0);
-      total.textContent = picked.size ? `${picked.size} selected · ${gb(mb)} to download` : "";
+      renderTotal();
     };
     list.addEventListener("change", (e) => {
       const c = e.target as HTMLInputElement;
       c.checked ? picked.add(c.dataset.id!) : picked.delete(c.dataset.id!);
-      render();
+      renderTotal(); // don't rebuild the list: keeps keyboard focus on the checkbox
     });
     list.addEventListener("click", async (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>("[data-delete]");
