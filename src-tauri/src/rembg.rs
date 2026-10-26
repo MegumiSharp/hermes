@@ -111,26 +111,60 @@ fn load_directml() {
         unsafe { LoadLibraryW(wide.as_ptr()) };
     }
 }
-/// One loaded model at a time (BiRefNet is ~1 GB of GPU memory). The lock also serialises GPU work.
-static SESSION: Mutex<Option<(&'static str, Session)>> = Mutex::new(None);
+/// How a model runs. Some models hit DirectML bugs in fused graph nodes ("DmlFusedNode_19_64"):
+/// they fall back to DirectML without graph fusion, then to the CPU.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Mode {
+    Gpu,
+    GpuSafe,
+    Cpu,
+}
 
-fn load(m: &'static Model) -> Result<Session, String> {
+impl Mode {
+    fn next(self) -> Option<Mode> {
+        match self {
+            Mode::Gpu => Some(Mode::GpuSafe),
+            Mode::GpuSafe => Some(Mode::Cpu),
+            Mode::Cpu => None,
+        }
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            Mode::Gpu => "GPU",
+            Mode::GpuSafe => "GPU (safe mode)",
+            Mode::Cpu => "CPU",
+        }
+    }
+}
+
+/// One loaded model at a time (BiRefNet is ~1 GB of GPU memory). The lock also serialises GPU work.
+static SESSION: Mutex<Option<(&'static str, Mode, Session)>> = Mutex::new(None);
+/// Per model, the first mode that worked (skips known-bad modes for the next images).
+static WORKING_MODE: LazyLock<Mutex<std::collections::HashMap<&'static str, Mode>>> = LazyLock::new(Default::default);
+
+fn load(m: &'static Model, mode: Mode) -> Result<Session, String> {
+    use ort::session::builder::GraphOptimizationLevel;
     let path = model_path(m);
     if !path.exists() {
         return Err(format!("Model {} is not downloaded", m.name));
     }
     let env = ENV.as_ref().map_err(Clone::clone)?;
     let e = |e: ort::Error<_>| e.to_string();
-    Session::builder(env)
-        .map_err(|e| e.to_string())?
-        .with_memory_pattern(false) // required by DirectML
-        .map_err(e)?
-        .with_parallel_execution(false)
-        .map_err(e)?
-        .with_execution_providers([ep::DirectML::default().build(), ep::CPU::default().build()])
-        .map_err(e)?
-        .commit_from_file(path)
-        .map_err(|e| e.to_string())
+    let mut b = Session::builder(env).map_err(|e| e.to_string())?;
+    b = match mode {
+        Mode::Gpu | Mode::GpuSafe => b
+            .with_memory_pattern(false) // required by DirectML
+            .map_err(e)?
+            .with_parallel_execution(false)
+            .map_err(e)?
+            .with_execution_providers([ep::DirectML::default().build().error_on_failure(), ep::CPU::default().build()])
+            .map_err(e)?,
+        Mode::Cpu => b.with_execution_providers([ep::CPU::default().build()]).map_err(e)?,
+    };
+    if mode == Mode::GpuSafe {
+        b = b.with_optimization_level(GraphOptimizationLevel::Level1).map_err(e)?; // no node fusion
+    }
+    b.commit_from_file(path).map_err(|e| e.to_string())
 }
 
 fn open_image(path: &str) -> Result<DynamicImage, String> {
@@ -146,8 +180,8 @@ fn open_image(path: &str) -> Result<DynamicImage, String> {
     Ok(img)
 }
 
-/// Alpha mask (0-255) at the image's size.
-fn predict(m: &'static Model, img: &DynamicImage) -> Result<GrayImage, String> {
+/// Alpha mask (0-255) at the image's size, plus the device that produced it.
+fn predict(m: &'static Model, img: &DynamicImage) -> Result<(GrayImage, Mode), String> {
     let s = m.kind.size();
     let rgb = img.resize_exact(s, s, FilterType::Lanczos3).to_rgb8();
     let max = rgb.as_raw().iter().copied().max().unwrap_or(255).max(1) as f32; // rembg divides by the max pixel
@@ -159,22 +193,40 @@ fn predict(m: &'static Model, img: &DynamicImage) -> Result<GrayImage, String> {
             data[c * n + i] = (p[c] as f32 / max - mean[c]) / std[c];
         }
     }
-    let input = ort::value::Tensor::from_array(([1usize, 3, s as usize, s as usize], data)).map_err(|e| e.to_string())?;
+    let shape = [1usize, 3, s as usize, s as usize];
 
     let mut guard = SESSION.lock().unwrap_or_else(|e| e.into_inner());
-    if guard.as_ref().is_none_or(|(id, _)| *id != m.id) {
-        *guard = None; // free the previous model first
-        *guard = Some((m.id, load(m)?));
-    }
-    let session = &mut guard.as_mut().unwrap().1;
-    let outputs = session.run(ort::inputs![input]).map_err(|e| e.to_string())?;
-    let (_, out) = outputs[0].try_extract_tensor::<f32>().map_err(|e| e.to_string())?;
-    let pred: Vec<f32> = out[..n].iter().map(|&v| if m.kind == Kind::BiRefNet { 1.0 / (1.0 + (-v).exp()) } else { v }).collect();
+    let mut mode = WORKING_MODE.lock().unwrap().get(m.id).copied().unwrap_or(Mode::Gpu);
+    let raw: Vec<f32> = loop {
+        let attempt = (|| {
+            if guard.as_ref().is_none_or(|(id, md, _)| *id != m.id || *md != mode) {
+                *guard = None; // free the previous model first
+                *guard = Some((m.id, mode, load(m, mode)?));
+            }
+            let session = &mut guard.as_mut().unwrap().2;
+            let input = ort::value::Tensor::from_array((shape, data.clone())).map_err(|e| e.to_string())?;
+            let outputs = session.run(ort::inputs![input]).map_err(|e| e.to_string())?;
+            let (_, out) = outputs[0].try_extract_tensor::<f32>().map_err(|e| e.to_string())?;
+            Ok::<_, String>(out[..n].to_vec())
+        })();
+        match attempt {
+            Ok(v) => break v,
+            Err(e) => match mode.next() {
+                Some(next) => {
+                    *guard = None;
+                    mode = next;
+                }
+                None => return Err(e),
+            },
+        }
+    };
+    WORKING_MODE.lock().unwrap().insert(m.id, mode);
+    let pred: Vec<f32> = raw.iter().map(|&v| if m.kind == Kind::BiRefNet { 1.0 / (1.0 + (-v).exp()) } else { v }).collect();
     let (lo, hi) = pred.iter().fold((f32::MAX, f32::MIN), |(a, b), &v| (a.min(v), b.max(v)));
     let range = (hi - lo).max(1e-6);
     let bytes: Vec<u8> = pred.iter().map(|v| (((v - lo) / range) * 255.0).round() as u8).collect();
     let mask = GrayImage::from_raw(s, s, bytes).ok_or("bad mask size")?;
-    Ok(image::imageops::resize(&mask, img.width(), img.height(), FilterType::Lanczos3))
+    Ok((image::imageops::resize(&mask, img.width(), img.height(), FilterType::Lanczos3), mode))
 }
 
 /// Applies the mask; optional solid background ("#rrggbb") and crop to the subject.
@@ -205,17 +257,18 @@ fn compose(img: &DynamicImage, mask: &GrayImage, background: &str, crop: bool) -
     out
 }
 
-/// Queue step entry point: input image -> PNG cut-out at `output`.
-pub async fn remove(model_id: &str, input: &str, output: &str, background: &str, crop: bool) -> Result<(), String> {
+/// Queue step entry point: input image -> PNG cut-out at `output`. Returns the device used.
+pub async fn remove(model_id: &str, input: &str, output: &str, background: &str, crop: bool) -> Result<&'static str, String> {
     let m = model(model_id)?;
     let (input, output, background) = (input.to_string(), output.to_string(), background.to_string());
     tauri::async_runtime::spawn_blocking(move || {
         let img = open_image(&input)?;
-        let mask = predict(m, &img)?;
+        let (mask, mode) = predict(m, &img)?;
         if let Some(dir) = PathBuf::from(&output).parent() {
             fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         }
-        compose(&img, &mask, &background, crop).save(&output).map_err(|e| e.to_string())
+        compose(&img, &mask, &background, crop).save(&output).map_err(|e| e.to_string())?;
+        Ok(mode.label())
     })
     .await
     .map_err(|e| e.to_string())?
@@ -265,30 +318,40 @@ pub async fn rembg_download(app: AppHandle, ids: Vec<String>) -> Result<(), Stri
 pub fn rembg_delete(id: String) -> Result<(), String> {
     let m = model(&id)?;
     let mut guard = SESSION.lock().unwrap_or_else(|e| e.into_inner());
-    if guard.as_ref().is_some_and(|(loaded, _)| *loaded == m.id) {
+    if guard.as_ref().is_some_and(|(loaded, ..)| *loaded == m.id) {
         *guard = None;
     }
     fs::remove_file(model_path(m)).map_err(|e| e.to_string())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct CompareResult {
     model: String,
     output: String,
     ms: u64,
+    device: String,
     error: Option<String>,
 }
 
 /// Runs several models on one image for the compare grid. Results go to hermes-data/results.
+/// Emits "rembg-compare" with each result as it finishes, so the UI fills in progressively.
 #[tauri::command]
-pub async fn rembg_compare(input: String, models: Vec<String>) -> Vec<CompareResult> {
+pub async fn rembg_compare(app: AppHandle, input: String, models: Vec<String>) -> Vec<CompareResult> {
     let stem = PathBuf::from(&input).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
     let mut out = vec![];
     for id in models {
         let output = results_dir().join(format!("{stem}-{id}-{}.png", now_ms())).display().to_string();
         let t = Instant::now();
         let r = remove(&id, &input, &output, "", false).await;
-        out.push(CompareResult { model: id, output, ms: t.elapsed().as_millis() as u64, error: r.err() });
+        let res = CompareResult {
+            model: id,
+            output,
+            ms: t.elapsed().as_millis() as u64,
+            device: r.as_ref().map(|d| d.to_string()).unwrap_or_default(),
+            error: r.err(),
+        };
+        app.emit("rembg-compare", &res).ok();
+        out.push(res);
     }
     out
 }

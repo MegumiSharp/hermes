@@ -20,8 +20,14 @@ pub struct Meta {
 }
 
 pub async fn online() -> bool {
-    let req = client().get(format!("{API}/application/info")).timeout(Duration::from_millis(1500));
-    req.send().await.is_ok_and(|r| r.status().is_success())
+    // Eagle answers slowly while it imports or indexes: be patient and retry once before saying "closed".
+    for _ in 0..2 {
+        let req = client().get(format!("{API}/application/info")).timeout(Duration::from_secs(4));
+        if req.send().await.is_ok_and(|r| r.status().is_success()) {
+            return true;
+        }
+    }
+    false
 }
 
 /// Imports a file into Uncategorized (no folderId) and returns once Eagle holds a complete copy,

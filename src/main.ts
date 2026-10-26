@@ -2,34 +2,109 @@ import "@fontsource-variable/inter";
 import "./styles.css";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { availableMonitors, getCurrentWindow, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { icon, IconName } from "./icons";
-import { h, settings, saveSettings } from "./core";
+import { flushSettings, h, modal, settings, saveSettings, saveSettingsSoon } from "./core";
+import { mountActivity } from "./activity";
 import { checkForUpdate, startUpdateChecks } from "./update";
 import { renderBinaries, startBinaryChecks } from "./binaries";
 import { renderVideo } from "./modules/video";
 import { renderGallery } from "./modules/gallery";
 import { renderRembg } from "./modules/rembg";
 import { renderUpscale } from "./modules/upscale";
+import { renderAudible } from "./modules/audible";
+import { renderDemucs } from "./modules/demucs";
+import { renderWhisper } from "./modules/whisper";
 
+type Info = { about: string; sources?: string[]; formats?: string; engine: string; link?: string };
 type Module = {
   id: string;
   name: string;
   icon: IconName;
   section: "tools" | "system";
   render(view: HTMLElement): void;
+  info?: Info;
 };
 
 // Module registry: the only place that knows about every module.
 const modules: Module[] = [
-  { id: "video", name: "Video Downloader", icon: "download", section: "tools", render: renderVideo },
-  { id: "gallery", name: "Gallery Downloader", icon: "image", section: "tools", render: renderGallery },
-  { id: "rembg", name: "Background Removal", icon: "scissors", section: "tools", render: renderRembg },
-  { id: "upscale", name: "Upscale", icon: "maximize", section: "tools", render: renderUpscale },
+  {
+    id: "video", name: "Video Downloader", icon: "download", section: "tools", render: renderVideo,
+    info: {
+      about: "Downloads videos, playlists or just the audio. Best quality, 1080p, MP4 converted for Premiere (H.264 on your NVIDIA GPU) or MP3 320 kbps with cover.",
+      sources: ["YouTube (videos, Shorts, playlists)", "Vimeo", "TikTok", "Instagram", "X / Twitter", "Facebook", "Twitch (VODs, clips)", "Reddit", "SoundCloud", "Dailymotion", "Bilibili", "and 1,800+ more sites"],
+      engine: "yt-dlp + FFmpeg", link: "https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md",
+    },
+  },
+  {
+    id: "gallery", name: "Gallery Downloader", icon: "image", section: "tools", render: renderGallery,
+    info: {
+      about: "Downloads every image and video of a gallery, profile, post or board, with filters (type, size, resolution, date, title) and file-by-file selection.",
+      sources: ["Instagram", "X / Twitter", "Pixiv", "Reddit", "DeviantArt", "ArtStation", "Tumblr", "Pinterest", "Bluesky", "Imgur", "Flickr", "Danbooru / boorus", "Kemono", "Wikipedia / Wikimedia", "and 300+ more sites"],
+      engine: "gallery-dl", link: "https://github.com/mikf/gallery-dl/blob/master/docs/supportedsites.md",
+    },
+  },
+  {
+    id: "rembg", name: "Background Removal", icon: "scissors", section: "tools", render: renderRembg,
+    info: {
+      about: "Cuts the subject out of photos (transparent PNG, solid color or cropped). Compare several AI models on the same image and keep the best. Runs on your GPU.",
+      formats: "PNG, JPG, WebP, BMP, TIFF in; PNG out. Paste images with Ctrl+V.", engine: "rembg models (BiRefNet, ISNet, U2Net) on ONNX Runtime + DirectML",
+    },
+  },
+  {
+    id: "upscale", name: "Upscale", icon: "maximize", section: "tools", render: renderUpscale,
+    info: {
+      about: "Enlarges images 4× and videos 2-4× with AI detail recovery. Photo, illustration/anime and fast video models.",
+      formats: "PNG, JPG, WebP images; MP4, MKV, MOV, WebM, AVI videos (re-encoded to H.264 with the original audio).", engine: "Real-ESRGAN (ncnn, Vulkan GPU) + FFmpeg",
+    },
+  },
+  {
+    id: "demucs", name: "Stem Separation", icon: "waveform", section: "tools", render: renderDemucs,
+    info: {
+      about: "Splits a song into vocals, drums, bass and other (or 6 stems with guitar and piano), or simply vocals + instrumental.",
+      formats: "MP3, WAV, FLAC, M4A, OGG and video files in; WAV, FLAC or MP3 out.", engine: "Demucs (Meta) on PyTorch CUDA",
+    },
+  },
+  {
+    id: "whisper", name: "Subtitles", icon: "captions", section: "tools", render: renderWhisper,
+    info: {
+      about: "Transcribes speech into subtitles (SRT, VTT) or plain text, in the spoken language or translated to English. Language is detected automatically.",
+      formats: "Any video or audio file. Around 100 spoken languages.", engine: "faster-whisper (OpenAI Whisper models) on your GPU",
+    },
+  },
+  {
+    id: "audible", name: "Audible", icon: "headphones", section: "tools", render: renderAudible,
+    info: {
+      about: "Downloads the audiobooks you own as M4B files with chapters and cover, playable in any player. You sign in on Amazon's own page; Hermes never sees your password.",
+      sources: ["Audible marketplaces: Italy, US, UK, Germany, France, Spain, Canada, Australia, India, Japan, Brazil"],
+      engine: "audible-cli + FFmpeg",
+    },
+  },
   { id: "binaries", name: "Binaries", icon: "layers", section: "system", render: renderBinaries },
   { id: "settings", name: "Settings", icon: "sliders", section: "system", render: renderSettings },
 ];
+
+/** The "Info" button every tool shows in its header. */
+function infoButton(m: Module): HTMLElement {
+  const b = h(`<button class="btn sm ghost info-btn" title="What this tool does">${icon("info")}Info</button>`);
+  b.onclick = () => {
+    const i = m.info!;
+    const body = h(`<div class="info">
+      <p class="about"></p>
+      ${i.sources ? `<div class="field-label">Downloads from</div><ul class="sources"></ul>` : ""}
+      ${i.formats ? `<div class="field-label">Files</div><p class="formats"></p>` : ""}
+      <div class="field-label">Powered by</div><p class="engine"></p>
+      ${i.link ? `<button class="btn sm" data-link>${icon("link")}Full list of supported sites</button>` : ""}</div>`);
+    body.querySelector(".about")!.textContent = i.about;
+    body.querySelector(".engine")!.textContent = i.engine;
+    if (i.formats) body.querySelector(".formats")!.textContent = i.formats;
+    i.sources?.forEach((s) => { const li = document.createElement("li"); li.textContent = s; body.querySelector(".sources")!.append(li); });
+    body.querySelector<HTMLButtonElement>("[data-link]")?.addEventListener("click", () => openUrl(i.link!));
+    modal({ title: m.name, body });
+  };
+  return b;
+}
 
 const version = await getVersion();
 
@@ -41,6 +116,32 @@ async function renderSettings(view: HTMLElement) {
     <div class="row"><div><div class="k">Data folder</div><div class="v mono" id="data-path"></div></div><button class="btn sm" id="open-data">${icon("folder")}Open</button></div>
     <div class="row"><div><div class="k">Updates</div><div class="v" id="update-status">Checked automatically on launch and every 6 hours</div></div><button class="btn sm" id="check-update">${icon("refresh")}Check now</button></div></div>
   </div>`);
+  const tools = h(`<div class="card" id="tool-toggles"><div class="row"><div><div class="k">Tools</div>
+    <div class="sub">Hide the tools you don't use. Hidden tools keep their settings and queue.</div></div></div></div>`);
+  for (const m of modules.filter((m) => m.section === "tools")) {
+    const row = h(`<label class="row"><div class="v"></div><input type="checkbox" class="switch" data-tool="${m.id}"></label>`);
+    row.querySelector(".v")!.textContent = m.name;
+    const sw = row.querySelector("input")!;
+    sw.checked = !hidden().includes(m.id);
+    sw.onchange = () => {
+      const next = sw.checked ? hidden().filter((x) => x !== m.id) : [...hidden(), m.id];
+      if (next.length >= modules.filter((x) => x.section === "tools").length) {
+        sw.checked = true; // keep at least one tool
+        return;
+      }
+      saveSettings({ hiddenTools: next });
+      renderSidebar();
+    };
+    tools.append(row);
+  }
+  el.append(tools);
+  const prefs = h(`<div class="card"><label class="row"><div><div class="v">Show system stats in AI tools</div>
+    <div class="sub">CPU, RAM, GPU load, VRAM and temperature above Background Removal, Upscale, Stem Separation and Subtitles.</div></div>
+    <input type="checkbox" class="switch" id="show-stats"></label></div>`);
+  const stats = prefs.querySelector<HTMLInputElement>("#show-stats")!;
+  stats.checked = settings.showStats !== false;
+  stats.onchange = () => saveSettings({ showStats: stats.checked });
+  el.append(prefs);
   el.querySelector("#data-path")!.textContent = path;
   (el.querySelector("#open-data") as HTMLElement).onclick = () => revealItemInDir(path);
   const status = el.querySelector("#update-status")!;
@@ -59,28 +160,50 @@ async function renderSettings(view: HTMLElement) {
   view.append(el);
 }
 
+const hidden = (): string[] => settings.hiddenTools ?? [];
+const visible = () => modules.filter((m) => !hidden().includes(m.id));
+let current = "";
+
 function open(id: string) {
-  const mod = modules.find((m) => m.id === id) ?? modules[0];
+  const mod = visible().find((m) => m.id === id) ?? visible()[0];
+  current = mod.id;
   document.querySelectorAll(".nav").forEach((n) => n.classList.toggle("on", (n as HTMLElement).dataset.id === mod.id));
   const view = document.getElementById("view")!;
   view.replaceChildren();
   mod.render(view);
+  if (mod.info) {
+    // modules may render asynchronously: attach once their header exists
+    const attach = () => {
+      const head = view.querySelector(".page > .head");
+      if (!head) return requestAnimationFrame(attach);
+      let right = head.querySelector(".right");
+      if (!right) head.append((right = h(`<div class="right"></div>`)));
+      right.prepend(infoButton(mod));
+    };
+    attach();
+  }
   if (settings.lastModule !== mod.id) saveSettings({ lastModule: mod.id });
 }
 
 // ---------- sidebar ----------
 const side = document.getElementById("side")!;
-for (const section of ["tools", "system"] as const) {
-  if (section === "tools") side.append(h(`<div class="label">Tools</div>`));
-  else side.append(h(`<div class="spacer"></div>`));
-  for (const m of modules.filter((m) => m.section === section)) {
-    const n = h(`<button class="nav" data-id="${m.id}">${icon(m.icon)}<span>${m.name}</span></button>`);
-    n.onclick = () => open(m.id);
-    side.append(n);
+const activity = h(`<div class="activity" hidden></div>`);
+mountActivity(activity, (id) => modules.find((m) => m.id === id));
+function renderSidebar() {
+  side.replaceChildren();
+  for (const section of ["tools", "system"] as const) {
+    side.append(section === "tools" ? h(`<div class="label">Tools</div>`) : h(`<div class="spacer"></div>`));
+    if (section === "system") side.append(activity);
+    for (const m of visible().filter((m) => m.section === section)) {
+      const n = h(`<button class="nav ${m.id === current ? "on" : ""}" data-id="${m.id}">${icon(m.icon)}<span>${m.name}</span></button>`);
+      n.onclick = () => open(m.id);
+      side.append(n);
+    }
   }
 }
+renderSidebar();
 
-// ---------- title bar ----------
+// ---------- window: title bar + size/position remembered in settings.json (portable) ----------
 const win = getCurrentWindow();
 document.getElementById("mark")!.innerHTML = icon("feather");
 document.getElementById("ver")!.textContent = version;
@@ -91,7 +214,37 @@ const wc = (id: string, ic: IconName, fn: () => void) => {
 };
 wc("wc-min", "minus", () => win.minimize());
 wc("wc-max", "square", () => win.toggleMaximize());
-wc("wc-close", "x", () => win.close());
+wc("wc-close", "x", async () => {
+  await flushSettings();
+  win.close();
+});
+
+async function restoreWindow() {
+  const w = settings.window as { x: number; y: number; width: number; height: number; maximized: boolean } | undefined;
+  if (w) {
+    // only if the saved spot is still on a connected monitor
+    const onScreen = (await availableMonitors()).some((m) =>
+      w.x + 100 > m.position.x && w.x < m.position.x + m.size.width - 100 && w.y >= m.position.y - 10 && w.y < m.position.y + m.size.height - 100);
+    if (onScreen) {
+      await win.setSize(new PhysicalSize(w.width, w.height));
+      await win.setPosition(new PhysicalPosition(w.x, w.y));
+    }
+    if (w.maximized) await win.maximize();
+  }
+  await win.show();
+}
+async function rememberWindow() {
+  const maximized = await win.isMaximized();
+  if (maximized || (await win.isMinimized())) {
+    saveSettingsSoon({ window: { ...settings.window, maximized } });
+    return;
+  }
+  const [pos, size] = await Promise.all([win.outerPosition(), win.innerSize()]);
+  saveSettingsSoon({ window: { x: pos.x, y: pos.y, width: size.width, height: size.height, maximized: false } });
+}
+await restoreWindow();
+win.onResized(rememberWindow);
+win.onMoved(rememberWindow);
 
 window.addEventListener("hermes:open", (e) => open((e as CustomEvent<string>).detail));
 open(settings.lastModule);

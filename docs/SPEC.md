@@ -178,6 +178,38 @@ hermes-data/
   Frames are JPEG (q2) to limit disk use; the whole clip is extracted at once (no chunking yet).
   Limitation: slow (minutes per minute of 1080p video) and disk-heavy (a few GB per minute).
 
+## 8b. Persistence and visibility (T8)
+
+- Every field, choice and pending file list of every tool is saved in `settings.json` as it changes
+  (typing is debounced, flushed on close). Reopening Hermes restores them; URLs re-fetch their preview.
+- Window size, position and maximized state are restored (settings.json, portable).
+- Settings → Tools: hide tools you don't use (at least one stays visible); hidden tools keep their data.
+
+## 10. Audible (T9)
+
+- audible-cli (bundled) with config in `hermes-data/audible`. Sign-in: marketplace → Amazon page opens in the
+  user's browser → user pastes the final "Page not found" address → device registered. Password never seen.
+- Library list (cover, title, author, narrator, length, series) with search and multi-select, cached locally.
+- Download: `audible download --aax-fallback --cover` → ffmpeg decrypt (AAXC key/iv from voucher, AAX
+  activation bytes) → `<folder>\<Author>\<Title>.m4b` with chapters and cover; temp files removed.
+- Note: removing DRM may breach Audible's terms and EU/Italian law; personal backups only.
+
+## 11. AI runtime (T10/T11)
+
+- Portable CPython 3.12 + PyTorch 2.5.1 CUDA 12.4 in `hermes-data/python`, installed only after a
+  confirmation listing components and sizes; shared by Demucs and faster-whisper. Model caches in
+  `hermes-data/models` (TORCH_HOME / HF_HOME). Each model download is confirmed on first use.
+
+## 12. Stem Separation (Demucs)
+
+- Models: htdemucs (standard), htdemucs_ft (best, 4× slower), htdemucs_6s (+ guitar, piano).
+- All stems or vocals + instrumental; WAV, FLAC or MP3 320. Output `<folder>\Stems\<model>\<track> - <stem>`.
+
+## 13. Subtitles (faster-whisper)
+
+- Models large-v3-turbo (default), large-v3, medium, small, base. Language auto or chosen; transcribe or
+  translate to English; SRT / VTT / TXT. GPU float16 with CPU int8 fallback.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.

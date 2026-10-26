@@ -1,6 +1,7 @@
 // Binary manager UI (SPEC 4.1). Backend: src-tauri/src/binaries.rs.
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { startTask } from "./activity";
 import { banner, h, navigate, saveSettings, settings } from "./core";
 import { icon } from "./icons";
 
@@ -25,6 +26,8 @@ listen<[string, number, number]>("binary-progress", ({ payload: [id, done, total
 async function update(id: string): Promise<boolean> {
   updating.set(id, 0);
   rerender();
+  const task = startTask(`bin-${id}`, `Updating ${statuses.find((s) => s.id === id)?.name ?? id}`, "binaries");
+  const tick = setInterval(() => task.update(updating.get(id) ?? null), 500);
   try {
     const s = await invoke<Status>("binary_update", { id });
     statuses = statuses.map((x) => (x.id === id ? s : x));
@@ -33,6 +36,8 @@ async function update(id: string): Promise<boolean> {
     banner({ id: `bin-${id}`, tone: "warn", icon: "alert", text: `Updating ${id} failed: ${e}` });
     return false;
   } finally {
+    clearInterval(tick);
+    task.end();
     updating.delete(id);
     rerender();
   }

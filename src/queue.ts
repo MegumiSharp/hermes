@@ -2,14 +2,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { banner, h } from "./core";
+import { banner, h, modal } from "./core";
 import { icon, IconName } from "./icons";
 
 export type Step =
   | { type: "run"; label: string; bin: string; args: string[]; parser: "ytDlp" | "ffmpeg" | "plain" | "galleryDl" | "percent"; outputs?: string[]; duration?: number; replace?: boolean }
   | { type: "eagle"; keep?: boolean }
   | { type: "delete"; paths: string[] }
-  | { type: "rembg"; model: string; input: string; output: string; background?: string; crop?: boolean };
+  | { type: "rembg"; model: string; input: string; output: string; background?: string; crop?: boolean }
+  | { type: "audible"; asin: string; title: string; author: string; duration: number; folder: string };
 export type EagleMeta = { website?: string; tags?: string[]; annotation?: string };
 export type NewJob = {
   module: string; title: string; pill?: string; steps?: Step[]; eagle?: EagleMeta; children?: NewJob[];
@@ -20,14 +21,39 @@ type State = "queued" | "running" | "paused" | "waitingEagle" | "done" | "failed
 export type Job = {
   id: string; module: string; title: string; pill: string; parent: string | null; group: boolean;
   steps: Step[]; step: number; state: State; progress: number; detail: string; error: string;
-  outputs: string[]; inEagle: boolean; source: string;
+  outputs: string[]; inEagle: boolean; source: string; note: string;
+  items: { name: string; ok: boolean; error: string }[];
 };
 
-/** Calls `fn(jobs)` now and on every queue change; stops when `alive()` turns false. */
-export function watchJobs(fn: (jobs: Job[]) => void, alive: () => boolean) {
-  const v = { full: () => (alive() ? fn(queue.jobs) : views.delete(v)), light: () => {} };
+/** Calls `fn(jobs)` now and on every queue change (also on progress ticks if `ticks`);
+ *  stops when `alive()` turns false. */
+export function watchJobs(fn: (jobs: Job[]) => void, alive: () => boolean, ticks = false) {
+  const v = {
+    full: () => (alive() ? fn(queue.jobs) : views.delete(v)),
+    light: () => { if (ticks) v.full(); },
+  };
   views.add(v);
   fn(queue.jobs);
+}
+
+/** Full error text in a modal, selectable, with a copy button (for bug reports). */
+export function showError(j: Pick<Job, "title" | "error">) {
+  const body = h(`<div class="err-box"><pre class="mono"></pre></div>`);
+  body.querySelector("pre")!.textContent = j.error;
+  modal({
+    title: `Error: ${j.title}`,
+    body,
+    actions: [
+      { label: "Close" },
+      {
+        label: "Copy error", primary: true,
+        run: async () => {
+          await navigator.clipboard.writeText(`${j.title}\n${j.error}`);
+          banner({ id: "copied", icon: "check", text: "Error copied to the clipboard." });
+        },
+      },
+    ],
+  });
 }
 type Queue = { jobs: Job[]; pausedUntil: number; backoffMin: number; pausedAll: boolean };
 
@@ -54,6 +80,25 @@ listen<{ id: string; progress: number; detail: string }>("job", ({ payload: p })
   }
   views.forEach((v) => v.light());
 });
+// per-file log of gallery-dl jobs, appended live to an open details list
+listen<{ id: string; item: Job["items"][number] }>("job-item", ({ payload: p }) => {
+  const j = queue.jobs.find((x) => x.id === p.id);
+  if (!j) return;
+  (j.items ??= []).push(p.item);
+  document.querySelectorAll(`[data-job="${p.id}"] > .files`).forEach((list) => list.prepend(fileRow(p.item)));
+  document.querySelectorAll(`[data-job="${p.id}"] > .top .exp-files`).forEach((b) => (b.textContent = filesLabel(j)));
+});
+
+function fileRow(f: Job["items"][number]): HTMLElement {
+  const row = h(`<div class="file-row ${f.ok ? "ok" : "bad"}">${icon(f.ok ? "check" : "alert")}<span class="nm"></span><span class="st"></span></div>`);
+  row.querySelector(".nm")!.textContent = f.name;
+  row.querySelector(".st")!.textContent = f.error || "downloaded";
+  return row;
+}
+const filesLabel = (j: Job) => {
+  const bad = j.items.filter((f) => !f.ok).length;
+  return `${j.items.length} files${bad ? ` · ${bad} failed` : ""}`;
+};
 
 const usesEagle = (j: NewJob): boolean => !!j.steps?.some((s) => s.type === "eagle") || !!j.children?.some(usesEagle);
 
@@ -103,7 +148,7 @@ function statusText(j: Job, state: State): string {
     case "paused": return "Paused";
     case "waitingEagle": return "Eagle is closed";
     case "failed": return j.error || "Failed";
-    case "done": return j.inEagle ? "In Eagle" : "Done";
+    case "done": return [j.inEagle ? "In Eagle" : "Done", j.note].filter(Boolean).join(" · ");
   }
 }
 
@@ -114,6 +159,7 @@ function actions(j: Job, state: State): string {
   const a: string[] = [];
   if (state === "running" || state === "queued") a.push(btn("pause", j.id, "pause", "Pause"));
   if (state === "paused") a.push(btn("resume", j.id, "play", "Resume"));
+  if (state === "failed" && !j.group) a.push(btn("error", j.id, "copy", "Show and copy the error"));
   if (state === "failed" || state === "waitingEagle") a.push(btn("retry", j.id, "retry", "Retry"));
   if (state === "waitingEagle") a.push(btn("keep", j.id, "folder", "Keep in folder, skip Eagle"));
   if (state === "done" && !j.inEagle && !j.group && j.outputs.length) a.push(btn("reveal", j.id, "folder", "Show in folder"));
@@ -129,10 +175,20 @@ function item(j: Job): HTMLElement {
       ${j.group ? `<button class="btn sm ghost exp" data-act="expand" data-id="${j.id}" aria-label="Expand">${icon(open ? "chevronDown" : "chevronRight")}</button>` : ""}
       <span class="ic">${icon(j.group ? "list" : stateIcon[state])}</span>
       <span class="nm"></span>${j.pill ? `<span class="pill"></span>` : ""}
+      ${j.items?.length ? `<button class="btn sm ghost exp-files" data-act="files" data-id="${j.id}" title="Show each file"></button>` : ""}
       <span class="st"></span><span class="acts">${actions(j, state)}</span>
     </div>
     ${state === "done" ? "" : `<div class="bar"><i style="width:${pct(jobProgress(j))}"></i></div>`}
   </div>`);
+  if (j.items?.length) {
+    el.querySelector(".exp-files")!.textContent = filesLabel(j);
+    if (expanded.has(`files-${j.id}`)) {
+      const list = h(`<div class="files"></div>`);
+      list.append(...[...j.items].reverse().map(fileRow)); // newest first
+      el.append(list);
+    }
+  }
+  if (state === "failed") el.querySelector(".st")!.classList.add("clickable");
   el.querySelector(".nm")!.textContent = j.title;
   el.querySelector(".nm")!.setAttribute("title", j.title);
   if (j.pill) el.querySelector(".pill")!.textContent = j.pill;
@@ -167,10 +223,19 @@ export function mountQueue(el: HTMLElement, module?: string) {
     <div class="list"></div>
   </div>`);
   root.addEventListener("click", (e) => {
+    const failedText = (e.target as HTMLElement).closest(".item.failed > .top .st");
+    if (failedText) {
+      const j = queue.jobs.find((x) => x.id === failedText.closest<HTMLElement>(".item")!.dataset.job);
+      if (j) showError(j);
+      return;
+    }
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-act]");
     if (!b) return;
     const { act, id } = b.dataset as { act: string; id: string };
-    if (act === "expand") { expanded.has(id) ? expanded.delete(id) : expanded.add(id); render(); }
+    const toggle = (key: string) => { expanded.has(key) ? expanded.delete(key) : expanded.add(key); render(); };
+    if (act === "expand") toggle(id);
+    else if (act === "files") toggle(`files-${id}`);
+    else if (act === "error") showError(queue.jobs.find((j) => j.id === id)!);
     else if (act === "clear") invoke("queue_clear_finished");
     else if (act === "pauseAll") invoke("queue_pause_all", { paused: !queue.pausedAll });
     else if (act === "resumeNow") invoke("queue_resume_now");

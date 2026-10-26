@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { toolStatus, binariesReady } from "../binaries";
 import { cookieArgs, cookieLabel, cookiesModal, isCookieError, markBroken } from "../cookies";
 import { SITES, siteForUrl } from "../cookies-validate";
-import { banner, h, saveSettings, settings } from "../core";
+import { banner, h, saveSettings, saveSettingsSoon, settings } from "../core";
 import { icon } from "../icons";
 import { addJobs, mountQueue, Step } from "../queue";
 import { eagleControls, folderField, paths } from "./common";
@@ -14,14 +14,21 @@ type Kind = "image" | "video" | "gif";
 type Filters = {
   types: Record<Kind, boolean>; extOff: string[]; minW: number; minH: number;
   sizeMin: number; sizeMax: number; dateFrom: string; dateTo: string; limit: number; skipDownloaded: boolean;
+  titleHas: string; titleNot: string; // comma-separated words matched against title/description
 };
-type Prefs = { folder: string; eagle: boolean; filters: Filters };
-type Item = { key: string; url: string; ext: string; kind: Kind; w: number; h: number; date: number | null; author: string; off: boolean };
+type Prefs = { folder: string; eagle: boolean; filters: Filters; url: string; offKeys: string[]; previews: boolean };
+type Item = {
+  key: string; url: string; ext: string; kind: Kind; w: number; h: number; date: number | null; author: string; off: boolean;
+  title: string; // post title / description / caption, for text filters and the list view
+};
 
 const DEFAULT_FILTERS: Filters = {
   types: { image: true, video: true, gif: true }, extOff: [], minW: 0, minH: 0,
-  sizeMin: 0, sizeMax: 0, dateFrom: "", dateTo: "", limit: 200, skipDownloaded: true,
+  sizeMin: 0, sizeMax: 0, dateFrom: "", dateTo: "", limit: 200, skipDownloaded: true, titleHas: "", titleNot: "",
 };
+const words = (s: string) => s.split(",").map((w) => w.trim().toLowerCase()).filter(Boolean);
+const textOf = (m: Record<string, any>) =>
+  ["title", "description", "content", "caption", "text", "summary"].map((k) => m[k]).find((v) => typeof v === "string" && v.trim())?.replace(/\s+/g, " ").trim() ?? "";
 const VIDEO = ["mp4", "webm", "mov", "mkv", "m4v", "avi"];
 
 function kindOf(ext: string): Kind {
@@ -60,6 +67,7 @@ function parse(messages: unknown[]): { items: Item[]; category: string; queued: 
     items.push({
       key: `${meta.filename ?? ""}.${ext}`, url: m[1], ext, kind: kindOf(ext),
       w: Number(meta.width) || 0, h: Number(meta.height) || 0, date: parseDate(meta.date), author: authorOf(meta), off: false,
+      title: textOf(meta),
     });
   }
   return { items, category, queued };
@@ -72,6 +80,10 @@ function passes(i: Item, f: Filters): boolean {
   if (f.minH && i.h && i.h < f.minH) return false;
   if (f.dateFrom && i.date && i.date < Date.parse(f.dateFrom)) return false;
   if (f.dateTo && i.date && i.date > Date.parse(f.dateTo) + 86400000 - 1) return false;
+  const text = `${i.title} ${i.key}`.toLowerCase();
+  const has = words(f.titleHas), not = words(f.titleNot);
+  if (has.length && !has.some((w) => text.includes(w))) return false; // any of the words
+  if (not.some((w) => text.includes(w))) return false;
   return true;
 }
 
@@ -79,9 +91,11 @@ function passes(i: Item, f: Filters): boolean {
 const filterExpr = (keys: string[]) => `(filename + '.' + extension) in {${keys.map((k) => JSON.stringify(k)).join(", ")}}`;
 
 export function renderGallery(view: HTMLElement) {
-  const prefs: Prefs = { folder: "", eagle: true, ...settings.gallery, filters: { ...DEFAULT_FILTERS, ...settings.gallery?.filters } };
+  const prefs: Prefs = { folder: "", eagle: true, url: "", offKeys: [], previews: false, ...settings.gallery, filters: { ...DEFAULT_FILTERS, ...settings.gallery?.filters } };
   prefs.filters.types = { ...DEFAULT_FILTERS.types, ...prefs.filters.types };
-  const save = () => saveSettings({ gallery: prefs });
+  const save = (soon = false) => (soon ? saveSettingsSoon : saveSettings)({ gallery: prefs });
+  /** Manual picks survive restarts: stored as the keys of the files turned off. */
+  const saveOff = () => { prefs.offKeys = items.filter((i) => i.off).map((i) => i.key); save(); };
   let items: Item[] = [];
   let source = { url: "", category: "" };
   let probing = 0;
@@ -99,7 +113,8 @@ export function renderGallery(view: HTMLElement) {
     <div class="g-body">
       <div class="g-results">
         <div class="g-bar"><span id="g-summary" class="sub">Fetch a URL to preview its files</span>
-          <div class="right"><button class="btn sm ghost" id="g-all">Select all</button><button class="btn sm ghost" id="g-none">Select none</button></div></div>
+          <div class="right"><label class="f-check g-prev"><input type="checkbox" id="g-previews">Show previews</label>
+            <button class="btn sm ghost" id="g-all">Select all</button><button class="btn sm ghost" id="g-none">Select none</button></div></div>
         <div class="g-grid" id="g-grid"></div>
       </div>
       <aside class="g-filters" id="g-filters"></aside>
@@ -134,6 +149,10 @@ export function renderGallery(view: HTMLElement) {
     const f = prefs.filters;
     const exts = [...new Set(items.map((i) => i.ext))].sort();
     fp.innerHTML = `
+      <div class="f-group"><div class="field-label">Title contains</div>
+        <input type="text" data-text="titleHas" placeholder="e.g. sketch, wip"><div class="sub">Any of the words (comma separated)</div></div>
+      <div class="f-group"><div class="field-label">Title excludes</div>
+        <input type="text" data-text="titleNot" placeholder="e.g. ad, promo"></div>
       <div class="f-group"><div class="field-label">Media type</div>
         ${(["image", "video", "gif"] as Kind[]).map((k) => `<label class="f-check"><input type="checkbox" data-type="${k}" ${f.types[k] ? "checked" : ""}>${k === "gif" ? "GIFs" : k === "image" ? "Images" : "Videos"}<span class="sub">${items.filter((i) => i.kind === k).length}</span></label>`).join("")}</div>
       ${exts.length ? `<div class="f-group"><div class="field-label">Extensions</div><div class="f-exts">
@@ -148,7 +167,15 @@ export function renderGallery(view: HTMLElement) {
       <div class="f-group"><div class="field-label">Items to read</div>
         <input type="number" min="1" step="50" data-num="limit" value="${f.limit}"><div class="sub">First N files of the URL; Fetch again after changing</div></div>
       <label class="f-check"><input type="checkbox" data-bool="skipDownloaded" ${f.skipDownloaded ? "checked" : ""}>Skip already downloaded</label>`;
+    fp.querySelectorAll<HTMLInputElement>("[data-text]").forEach((t) => (t.value = (f as any)[t.dataset.text!]));
   }
+  fp.addEventListener("input", (e) => {
+    const t = e.target as HTMLInputElement;
+    if (!t.dataset.text) return;
+    (prefs.filters as any)[t.dataset.text] = t.value; // live while typing
+    save(true);
+    renderGrid();
+  });
   fp.addEventListener("change", (e) => {
     const t = e.target as HTMLInputElement;
     const f = prefs.filters;
@@ -179,12 +206,27 @@ export function renderGallery(view: HTMLElement) {
       ? `${sel.length} of ${items.length} selected${visible.length < items.length ? ` · ${items.length - visible.length} hidden by filters` : ""}`
       : "Fetch a URL to preview its files";
     addBtn.disabled = !sel.length;
+    grid.classList.toggle("as-list", !prefs.previews);
+    if (!prefs.previews) {
+      // list view (default): readable with hundreds of files and needs no remote thumbnails
+      grid.replaceChildren(...visible.map((i) => {
+        const r = h(`<button type="button" class="g-row tile ${i.off ? "off" : ""}" data-key="">
+          <span class="t-check">${icon("check")}</span>${icon(i.kind === "video" ? "film" : "image")}
+          <span class="g-name"><b></b><span class="sub"></span></span><span class="mono sub g-meta"></span></button>`);
+        r.dataset.key = i.key;
+        r.querySelector("b")!.textContent = i.title || i.key;
+        r.querySelector(".g-name .sub")!.textContent = i.title ? i.key : i.author;
+        r.querySelector(".g-meta")!.textContent = [i.ext.toUpperCase(), i.w && i.h ? `${i.w}×${i.h}` : "", i.date ? new Date(i.date).toLocaleDateString() : ""].filter(Boolean).join(" · ");
+        return r;
+      }));
+      return;
+    }
     grid.replaceChildren(...visible.map((i) => {
       const t = h(`<button type="button" class="tile ${i.off ? "off" : ""}" data-key="" title="">
         ${i.kind === "video" ? `<span class="t-icon">${icon("film")}</span>` : `<img loading="lazy" alt="" referrerpolicy="no-referrer">`}
         <span class="t-check">${icon("check")}</span><span class="t-meta mono"></span></button>`);
       t.dataset.key = i.key;
-      t.title = i.key;
+      t.title = i.title || i.key;
       t.querySelector(".t-meta")!.textContent = [i.ext.toUpperCase(), i.w && i.h ? `${i.w}×${i.h}` : ""].filter(Boolean).join(" · ");
       const img = t.querySelector("img");
       if (img) {
@@ -198,10 +240,14 @@ export function renderGallery(view: HTMLElement) {
     const t = (e.target as HTMLElement).closest<HTMLElement>(".tile");
     if (!t) return;
     items.filter((i) => i.key === t.dataset.key).forEach((i) => (i.off = !i.off));
+    saveOff();
     renderGrid();
   });
-  $("#g-all").onclick = () => { items.forEach((i) => (i.off = false)); renderGrid(); };
-  $("#g-none").onclick = () => { items.forEach((i) => (i.off = true)); renderGrid(); };
+  const previews = $<HTMLInputElement>("#g-previews");
+  previews.checked = prefs.previews;
+  previews.onchange = () => { prefs.previews = previews.checked; save(); renderGrid(); };
+  $("#g-all").onclick = () => { items.forEach((i) => (i.off = false)); saveOff(); renderGrid(); };
+  $("#g-none").onclick = () => { items.forEach((i) => (i.off = true)); saveOff(); renderGrid(); };
 
   // ----- probe -----
   async function probe() {
@@ -231,6 +277,8 @@ export function renderGallery(view: HTMLElement) {
     grid.classList.remove("loading");
     const parsed = parse(result);
     items = parsed.items;
+    if (url === prefs.url) items.forEach((i) => (i.off = prefs.offKeys.includes(i.key))); // restore picks for the same URL
+    else { prefs.url = url; prefs.offKeys = []; save(); }
     source = { url, category: parsed.category || known };
     refreshCookies();
     renderFilters();
@@ -252,6 +300,8 @@ export function renderGallery(view: HTMLElement) {
   }
   $<HTMLFormElement>("#g-form").onsubmit = (e) => { e.preventDefault(); probe(); };
   $("#g-url").addEventListener("paste", () => setTimeout(probe, 0));
+  // typing is remembered; the picks are tied to the URL they were made on (prefs.url updates on fetch)
+  $("#g-url").addEventListener("input", () => { settings.galleryDraft = $<HTMLInputElement>("#g-url").value; saveSettingsSoon({}); });
 
   // ----- add -----
   addBtn.onclick = async () => {
@@ -280,6 +330,9 @@ export function renderGallery(view: HTMLElement) {
 
   renderFilters();
   renderGrid();
+  // restore after a restart: the typed URL, and the last fetched gallery with its picks
+  $<HTMLInputElement>("#g-url").value = settings.galleryDraft ?? prefs.url;
+  if (prefs.url && $<HTMLInputElement>("#g-url").value === prefs.url) probe();
   mountQueue(page, "gallery");
   view.append(page);
 }

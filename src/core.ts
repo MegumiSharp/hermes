@@ -5,9 +5,34 @@ import { icon, IconName } from "./icons";
 // ---------- settings (hermes-data/settings.json) ----------
 export const settings: Record<string, any> = await invoke("load_settings");
 
+let pending: ReturnType<typeof setTimeout> | undefined;
+
 export function saveSettings(patch: Record<string, any>) {
   Object.assign(settings, patch);
+  clearTimeout(pending);
+  pending = undefined;
   return invoke("save_settings", { settings });
+}
+
+/** For keystroke-level changes (URL fields): coalesces writes, flushed on close by `flushSettings`. */
+export function saveSettingsSoon(patch: Record<string, any>) {
+  Object.assign(settings, patch);
+  clearTimeout(pending);
+  pending = setTimeout(() => saveSettings({}), 300);
+}
+
+export async function flushSettings() {
+  if (pending) await saveSettings({});
+}
+
+/**
+ * Module state that survives closing the app (SPEC: nothing typed or picked is ever lost).
+ * Returns the stored object merged over `defaults`; call `save()` after changing it
+ * (`save(true)` for typing, debounced).
+ */
+export function memory<T extends object>(key: string, defaults: T): { state: T; save: (soon?: boolean) => void } {
+  const state = { ...defaults, ...settings[key] } as T;
+  return { state, save: (soon) => (soon ? saveSettingsSoon : saveSettings)({ [key]: state }) };
 }
 
 /** Switches the sidebar module (main.ts listens), usable from banners without importing main. */

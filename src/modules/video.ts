@@ -4,12 +4,12 @@ import { downloadDir, join } from "@tauri-apps/api/path";
 import { open as pickFolder } from "@tauri-apps/plugin-dialog";
 import { binariesReady, toolStatus } from "../binaries";
 import { cookieArgs, cookieLabel, cookiesModal, isCookieError, markBroken } from "../cookies";
-import { banner, h, saveSettings, settings } from "../core";
+import { banner, h, saveSettings, saveSettingsSoon, settings } from "../core";
 import { icon } from "../icons";
 import { addJobs, mountQueue, NewJob, Step } from "../queue";
 
 type Format = "best" | "1080p" | "mp4" | "mp3";
-type Prefs = { format: Format; folder: string; eagle: boolean };
+type Prefs = { format: Format; folder: string; eagle: boolean; url: string };
 
 /** The subset of `yt-dlp -J` output we use. */
 type Info = {
@@ -95,8 +95,8 @@ function videoJob(v: Info, channel: string, p: Prefs, cookies: string[]): NewJob
 // ---------- module ----------
 
 export function renderVideo(view: HTMLElement) {
-  const prefs: Prefs = { format: "best", folder: "", eagle: true, ...settings.video };
-  const save = () => saveSettings({ video: prefs });
+  const prefs: Prefs = { format: "best", folder: "", eagle: true, url: "", ...settings.video };
+  const save = (soon = false) => (soon ? saveSettingsSoon : saveSettings)({ video: prefs });
   let info: Info | null = null;
   let probing = 0; // id of the latest probe, so stale results are dropped
 
@@ -262,6 +262,7 @@ export function renderVideo(view: HTMLElement) {
 
   $<HTMLFormElement>("#v-form").onsubmit = (e) => { e.preventDefault(); probe(); };
   urlInput.addEventListener("paste", () => setTimeout(probe, 0));
+  urlInput.addEventListener("input", () => { prefs.url = urlInput.value; save(true); });
 
   // ----- add to queue -----
   addBtn.onclick = async () => {
@@ -273,7 +274,8 @@ export function renderVideo(view: HTMLElement) {
       : videoJob(info, channel, prefs, cookies);
     if (job.children && !job.children.length) return banner({ id: "video-empty", tone: "warn", icon: "alert", text: "This playlist has no videos." });
     await addJobs([job]);
-    urlInput.value = "";
+    urlInput.value = prefs.url = "";
+    save();
     preview.hidden = true;
     info = null;
     addBtn.disabled = true;
@@ -281,6 +283,10 @@ export function renderVideo(view: HTMLElement) {
   };
 
   renderFormat();
+  if (prefs.url) {
+    urlInput.value = prefs.url; // restored after a restart: fetch the preview again
+    probe();
+  }
   mountQueue(page, "video");
   view.append(page);
 }

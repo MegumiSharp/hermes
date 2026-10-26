@@ -11,10 +11,7 @@ use std::{
     time::Duration,
 };
 use tauri::{AppHandle, Emitter};
-use tokio::{
-    io::{AsyncBufReadExt, BufReader},
-    sync::Notify,
-};
+use tokio::sync::Notify;
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -84,6 +81,14 @@ pub enum Step {
         #[serde(default)]
         crop: bool,
     },
+    /// Download one Audible book and convert it to M4B (src-tauri/src/audible.rs).
+    Audible {
+        asin: String,
+        title: String,
+        author: String,
+        duration: f64,
+        folder: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -118,6 +123,34 @@ pub struct Job {
     /// Original input file, for before/after previews (Background Removal, Upscale).
     #[serde(default)]
     source: String,
+    /// Short extra info shown when done (e.g. the device a model ran on).
+    #[serde(default)]
+    note: String,
+    /// Per-file log of multi-file tools (gallery-dl): what downloaded and what the server refused.
+    #[serde(default)]
+    items: Vec<FileLog>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct FileLog {
+    name: String,
+    ok: bool,
+    #[serde(default)]
+    error: String,
+}
+
+/// Records one file of a multi-file step (kept in memory, persisted with the next state change).
+fn log_file(id: &str, entry: FileLog) {
+    let mut q = lock();
+    if let Some(j) = job_mut(&mut q, id) {
+        if j.items.len() < 2000 {
+            j.items.push(entry.clone());
+        }
+    }
+    drop(q);
+    if let Some(app) = APP.get() {
+        app.emit("job-item", serde_json::json!({ "id": id, "item": entry })).ok();
+    }
 }
 
 /// What a module submits. A job with `children` becomes an expandable group (it never runs itself).
@@ -278,7 +311,7 @@ fn pick() -> Vec<String> {
     ids.into_iter().map(|(id, _)| id).collect()
 }
 
-enum Stop {
+pub(crate) enum Stop {
     Failed(String),
     RateLimited,
     EagleOffline,
@@ -326,9 +359,20 @@ async fn run(id: String) {
                 }
                 Ok(vec![])
             }
+            Step::Audible { asin, title, author, duration, folder } => {
+                crate::audible::download_book(&id, &asin, &title, &author, duration, &folder).await
+            }
             Step::Rembg { model, input, output, background, crop } => {
                 tick(&id, 0.0, "Removing background".into());
-                crate::rembg::remove(&model, &input, &output, &background, crop).await.map(|_| vec![output]).map_err(Stop::Failed)
+                crate::rembg::remove(&model, &input, &output, &background, crop)
+                    .await
+                    .map(|device| {
+                        if let Some(j) = job_mut(&mut lock(), &id) {
+                            j.note = device.to_string();
+                        }
+                        vec![output]
+                    })
+                    .map_err(Stop::Failed)
             }
         };
         let ok = with(|q| {
@@ -368,6 +412,49 @@ async fn run(id: String) {
     }
 }
 
+/// Byte lines split on '\n' or '\r' (progress bars redraw with '\r'), decoded later with
+/// lossy UTF-8 so one bad byte never ends the read loop. Empty lines are skipped.
+struct Lines<R> {
+    r: R,
+    buf: Vec<u8>,
+    eof: bool,
+}
+
+impl<R: tokio::io::AsyncRead + Unpin> Lines<R> {
+    fn new(r: R) -> Self {
+        Self { r, buf: vec![], eof: false }
+    }
+
+    async fn next(&mut self) -> Option<Vec<u8>> {
+        use tokio::io::AsyncReadExt;
+        loop {
+            if let Some(i) = self.buf.iter().position(|&b| b == b'\n' || b == b'\r') {
+                let mut line: Vec<u8> = self.buf.drain(..=i).collect();
+                line.pop();
+                if line.is_empty() {
+                    continue;
+                }
+                return Some(line);
+            }
+            if self.eof {
+                return (!self.buf.is_empty()).then(|| std::mem::take(&mut self.buf));
+            }
+            let mut chunk = [0u8; 8192];
+            match self.r.read(&mut chunk).await {
+                Ok(0) | Err(_) => self.eof = true,
+                Ok(n) => self.buf.extend_from_slice(&chunk[..n]),
+            }
+        }
+    }
+}
+
+/// Last "42.5%" / "42,5%" in a line (tqdm bars: " 42%|████  | 3/7 [...]").
+fn percent(line: &str) -> Option<f64> {
+    let end = line.rfind('%')?;
+    let start = line[..end].rfind(|c: char| !(c.is_ascii_digit() || c == '.' || c == ',')).map_or(0, |i| i + 1);
+    line[start..end].replace(',', ".").parse().ok()
+}
+
 /// `{last}` = previous step's last output file, `{last_noext}` = same without extension.
 fn fill_placeholders(s: &str, last: &str) -> String {
     let noext = std::path::Path::new(last).with_extension("");
@@ -396,7 +483,7 @@ fn clock(secs: f64) -> String {
 }
 
 /// Runs one tool step; Ok(output files it reported).
-async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], parser: Parser, duration: f64) -> Result<Vec<String>, Stop> {
+pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], parser: Parser, duration: f64) -> Result<Vec<String>, Stop> {
     let mut child = binaries::command(bin)
         .args(args)
         .stdin(Stdio::null())
@@ -408,9 +495,8 @@ async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], parser: Par
     if let Some(pid) = child.id() {
         PIDS.lock().unwrap().insert(id.into(), pid);
     }
-    // split on bytes + lossy decode: one non-UTF-8 line must not end the read loop
-    let mut out = BufReader::new(child.stdout.take().unwrap()).split(b'\n');
-    let mut err = BufReader::new(child.stderr.take().unwrap()).split(b'\n');
+    let mut out = Lines::new(child.stdout.take().unwrap());
+    let mut err = Lines::new(child.stderr.take().unwrap());
     let (mut out_done, mut err_done) = (false, false);
     let mut files = vec![];
     let mut error_line = String::new(); // last "ERROR: ..." line
@@ -418,12 +504,13 @@ async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], parser: Par
     let mut rate_limited = false;
     let mut last_tick = 0;
     let mut count = 0u32; // GalleryDl files seen
+    let mut last_warning = String::new(); // server reason for the next "Failed to download"
     tick(id, 0.0, label.into());
 
     while !(out_done && err_done) {
         let line = tokio::select! {
-            l = out.next_segment(), if !out_done => l.ok().flatten().or_else(|| { out_done = true; None }),
-            l = err.next_segment(), if !err_done => l.ok().flatten().or_else(|| { err_done = true; None }),
+            l = out.next(), if !out_done => l.or_else(|| { out_done = true; None }),
+            l = err.next(), if !err_done => l.or_else(|| { err_done = true; None }),
         };
         let Some(line) = line else { continue };
         let line = String::from_utf8_lossy(&line);
@@ -440,6 +527,13 @@ async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], parser: Par
             error_line = e.to_string();
         } else if let Some((_, e)) = line.split_once("][error] ") {
             error_line = e.to_string(); // gallery-dl: "[download][error] Failed to download ..."
+            if let (Parser::GalleryDl, Some(name)) = (parser, e.strip_prefix("Failed to download ")) {
+                count += 1;
+                log_file(id, FileLog { name: name.into(), ok: false, error: std::mem::take(&mut last_warning) });
+            }
+        } else if let Some((_, w)) = line.split_once("][warning] ") {
+            // gallery-dl: "[downloader.http][warning] '429 Too many requests (…)' for 'https://…'"
+            last_warning = w.split(" for '").next().unwrap_or(w).trim_matches('\'').to_string();
         } else if !line.is_empty() && !line.starts_with("[hermes]") && !line.contains('=') {
             last_line = line.to_string();
         }
@@ -470,15 +564,14 @@ async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], parser: Par
                     files.push(path.to_string());
                 }
                 is_path.then(|| {
+                    let name = std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                    log_file(id, FileLog { name: name.clone(), ok: true, error: if skipped.is_some() { "already downloaded".into() } else { String::new() } });
                     count += 1;
                     let total = duration.max(count as f64);
-                    (count as f64 / total, format!("{label} {count} / {total:.0}"))
+                    (count as f64 / total, format!("{label} {count} / {total:.0} · {name}"))
                 })
             }
-            Parser::Percent => line
-                .strip_suffix('%')
-                .and_then(|n| n.trim().replace(',', ".").parse::<f64>().ok())
-                .map(|p| (p / 100.0, format!("{label} {p:.0}%"))),
+            Parser::Percent => percent(line).map(|p| (p / 100.0, format!("{label} {p:.0}%"))),
         };
         if let Some((pct, detail)) = update {
             if now_ms() - last_tick > 200 {
@@ -553,6 +646,8 @@ pub fn queue_add(jobs: Vec<NewJob>) -> Vec<String> {
             eagle: n.eagle,
             in_eagle: false,
             source: n.source,
+            note: String::new(),
+            items: vec![],
         });
         for c in n.children {
             make(c, Some(id.clone()), out);

@@ -44,6 +44,15 @@
     "notify": false
   },
   {
+    "id": "audible",
+    "name": "audible-cli",
+    "api": "https://api.github.com/repos/mkb79/audible-cli/releases/latest",
+    "asset": "audible_win.zip",
+    "files": ["audible.exe"],
+    "verify": ["--version"],
+    "notify": true
+  },
+  {
     "id": "directml",
     "name": "DirectML runtime",
     "api": "",

@@ -70,12 +70,20 @@ pub fn bin_dir() -> PathBuf {
 /// Hidden async command for a bundled tool, e.g. `command("yt-dlp.exe")`. The bin dir is put first
 /// on PATH so tools find each other (yt-dlp and gallery-dl call ffmpeg).
 pub fn command(file: &str) -> tokio::process::Command {
-    let mut c = tokio::process::Command::new(bin_dir().join(file));
+    // "python.exe" is the portable AI runtime (python.rs), not a bundled tool
+    let exe = if file == "python.exe" { crate::python::exe() } else { bin_dir().join(file) };
+    let mut c = tokio::process::Command::new(exe);
     let path = std::env::var_os("PATH").unwrap_or_default();
     let mut dirs = vec![bin_dir()];
     dirs.extend(std::env::split_paths(&path));
     c.env("PATH", std::env::join_paths(dirs).unwrap_or(path));
     c.env("PYTHONIOENCODING", "utf-8"); // non-ASCII titles/paths in tool output
+    c.env("PYTHONUNBUFFERED", "1"); // progress lines arrive live
+    c.env("AUDIBLE_CONFIG_DIR", data_dir().join("audible"));
+    // AI model caches stay portable too
+    c.env("TORCH_HOME", data_dir().join("models").join("torch"));
+    c.env("HF_HOME", data_dir().join("models").join("hf"));
+    c.env("HF_HUB_DISABLE_SYMLINKS_WARNING", "1");
     c.creation_flags(NO_WINDOW);
     c
 }

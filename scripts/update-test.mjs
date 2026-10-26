@@ -17,8 +17,8 @@ check((await app.page.textContent('[data-banner="app-update"]')).includes(want),
 
 const exited = new Promise((r) => app.proc.once("exit", r));
 await app.page.click('[data-banner="app-update"] .btn.primary');
-await app.page.waitForSelector(".modal .bar", { timeout: 5000 });
-check(true, "progress modal shown");
+await app.page.waitForSelector(".activity .act", { timeout: 15000 });
+check(true, "download progress shown in the sidebar");
 await exited;
 check(true, "old process exited after swap");
 

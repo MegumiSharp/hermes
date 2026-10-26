@@ -1,7 +1,7 @@
 // Drives the real Hermes.exe through WebView2's DevTools port.
 // Usage: node scripts/smoke.mjs [path\to\Hermes.exe]
 // Other test scripts import { launch } and reuse it.
-import { spawn } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -12,6 +12,9 @@ const DEFAULT_EXE = resolve("release/Hermes.exe");
 
 /** Starts the exe with a DevTools port and returns { page, proc, errors, close }. */
 export async function launch(exe = DEFAULT_EXE, port = 9333) {
+  // a Hermes left running by an aborted test would own WebView2's profile and DevTools port
+  try { execSync("taskkill /IM Hermes.exe /F", { stdio: "ignore" }); } catch {}
+  await new Promise((r) => setTimeout(r, 500));
   const proc = spawn(exe, [], {
     env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}` },
     stdio: "ignore",
@@ -35,6 +38,7 @@ export async function connect(port = 9333) {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  page.on("crash", () => console.log("!! WebView renderer crashed"));
   await page.waitForSelector(".nav");
   return { browser, page, errors };
 }

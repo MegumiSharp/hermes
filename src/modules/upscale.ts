@@ -5,7 +5,7 @@ import { binariesReady, toolStatus } from "../binaries";
 import { banner, h, saveSettings, settings } from "../core";
 import { icon } from "../icons";
 import { addJobs, mountQueue, NewJob, Step } from "../queue";
-import { dropZone, eagleControls, fileName, folderField, paths, resultsPanel, stem } from "./common";
+import { eagleControls, fileName, fileTray, folderField, paths, resultsPanel, statsBar, stem, TrayItem } from "./common";
 
 type Model = { id: string; name: string; scales: number[]; hint: string };
 const MODELS: Model[] = [
@@ -13,7 +13,7 @@ const MODELS: Model[] = [
   { id: "realesrgan-x4plus-anime", name: "Illustration", scales: [4], hint: "x4plus-anime: anime, drawings, line art" },
   { id: "realesr-animevideov3", name: "Video / fast", scales: [2, 3, 4], hint: "animevideov3: fast, made for video frames" },
 ];
-type Prefs = { folder: string; eagle: boolean; model: string; scale: number };
+type Prefs = { folder: string; eagle: boolean; model: string; scale: number; files: string[]; tray: TrayItem[] };
 
 const IMAGES = ["png", "jpg", "jpeg", "webp"];
 const VIDEOS = ["mp4", "mkv", "mov", "webm", "avi", "m4v"];
@@ -29,13 +29,14 @@ async function probeVideo(path: string): Promise<{ fps: string; duration: number
 }
 
 export function renderUpscale(view: HTMLElement) {
-  const prefs: Prefs = { folder: "", eagle: true, model: "realesrgan-x4plus", scale: 4, ...settings.upscale };
+  const prefs: Prefs = { folder: "", eagle: true, model: "realesrgan-x4plus", scale: 4, files: [], tray: [], ...settings.upscale };
+  if (prefs.files.length) { prefs.tray = prefs.files.map((path) => ({ path })); prefs.files = []; } // pre-T12 shape
   const save = () => saveSettings({ upscale: prefs });
-  let files: string[] = [];
 
   const page = h(`<div class="page upscale">
     <div class="head"><div><h3>Upscale</h3><div class="sub">Real-ESRGAN on your GPU, for images and videos</div></div>
       <div class="right"><span class="chip" id="u-tool"><span class="dot"></span>Real-ESRGAN</span></div></div>
+    <div id="u-stats"></div>
     <div class="u-files"></div>
     <div class="opts three">
       <div class="opt"><span class="field-label">Model</span><select class="select" id="u-model">${MODELS.map((m) => `<option value="${m.id}">${m.name}</option>`).join("")}</select></div>
@@ -69,25 +70,15 @@ export function renderUpscale(view: HTMLElement) {
   modelSel.onchange = () => { prefs.model = modelSel.value; renderModel(); save(); };
   scaleSel.onchange = () => { prefs.scale = Number(scaleSel.value); save(); };
 
-  const box = $(".u-files");
-  function renderFiles() {
-    box.replaceChildren(dropZone({ id: "u-drop", label: "Drop images or videos here", exts: [...IMAGES, ...VIDEOS], multiple: true }, (p) => {
-      files = [...new Set([...files, ...p])];
-      renderFiles();
-    }));
-    if (files.length) {
-      const chips = h(`<div class="file-chips"></div>`);
-      chips.append(...files.map((f) => {
-        const c = h(`<span class="chip file">${isVideo(f) ? icon("film") : icon("image")}<span></span><button type="button" aria-label="Remove">${icon("x")}</button></span>`);
-        c.querySelector("span")!.textContent = stem(f);
-        c.querySelector("button")!.onclick = () => { files = files.filter((x) => x !== f); renderFiles(); };
-        return c;
-      }));
-      box.append(chips);
-    }
-    $("#u-video-note").hidden = !files.some(isVideo);
-    goBtn.disabled = !files.length;
-    goBtn.lastChild!.textContent = files.length > 1 ? `Upscale ${files.length} files` : "Upscale";
+  $("#u-stats").append(statsBar());
+  const tray = fileTray({ id: "u-drop", label: "Drop images or videos here", exts: [...IMAGES, ...VIDEOS], multiple: true, paste: true },
+    () => prefs.tray, (l) => { prefs.tray = l; save(); }, () => update());
+  $(".u-files").append(tray.el);
+  function update() {
+    const todo = tray.pending();
+    $("#u-video-note").hidden = !todo.some((i) => isVideo(i.path));
+    goBtn.disabled = !todo.length;
+    goBtn.lastChild!.textContent = todo.length > 1 ? `Upscale ${todo.length} files` : "Upscale";
   }
 
   async function imageJob(input: string, p: { bin: string; results: string }): Promise<NewJob> {
@@ -127,18 +118,18 @@ export function renderUpscale(view: HTMLElement) {
     goBtn.disabled = true;
     await binariesReady;
     const p = await paths;
+    const todo = tray.pending();
     try {
-      const jobs = await Promise.all(files.map((f) => (isVideo(f) ? videoJob(f, p) : imageJob(f, p))));
-      await addJobs(jobs);
-      files = [];
+      const jobs = await Promise.all(todo.map((it) => (isVideo(it.path) ? videoJob(it.path, p) : imageJob(it.path, p))));
+      tray.assign(todo, await addJobs(jobs));
     } catch (e) {
       banner({ id: "upscale-error", tone: "warn", icon: "alert", text: `Could not read the file: ${e}` });
     }
-    renderFiles();
+    update();
   };
 
   renderModel();
-  renderFiles();
+  update();
   page.append(resultsPanel("upscale"));
   mountQueue(page, "upscale");
   view.append(page);

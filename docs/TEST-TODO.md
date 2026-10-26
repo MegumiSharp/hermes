@@ -57,12 +57,47 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] Video breve (10-30 s): modello **Video / fast** 2× → MP4 H.264 con audio originale; controlla che `hermes-data\temp` venga svuotata alla fine.
 - [ ] Video lungo: verifica tempi e spazio disco (avviso sul consumo di spazio).
 
+## 7. Memoria e strumenti nascosti
+- [ ] Settings → Tools: spegni un tool che non usi, sparisce dalla sidebar; riaprendo Hermes resta nascosto.
+- [ ] Scrivi un URL, trascina file, cambia schede/opzioni in ogni tool, poi chiudi Hermes (anche con la X) e riaprilo: ritrovi tutto, e le anteprime degli URL si ricaricano da sole.
+- [ ] Sposta e ridimensiona la finestra (o massimizzala), chiudi e riapri: torna com'era.
+
+## 8. Audible
+- [ ] Audible → scegli il marketplace (Italia) → **Sign in with Amazon**: si apre il browser sulla pagina Amazon.
+- [ ] Fai il login (a volte due volte + captcha), arrivi su "Pagina non trovata": copia l'indirizzo completo, incollalo in Hermes → **Connect**.
+- [ ] Compare la tua libreria con copertine; prova la ricerca (titolo, autore, narratore, serie).
+- [ ] Seleziona 1 libro corto → Download: in coda "Downloading" poi "Converting to M4B"; risultato `Cartella\Autore\Titolo.m4b`.
+- [ ] Apri l'M4B in un player (es. VLC o l'app Libri): **capitoli** e **copertina** presenti, audio completo.
+- [ ] Il libro risulta "Downloaded" nella lista. Chiudendo e riaprendo resti collegato.
+- [ ] Sign out funziona (il dispositivo resta in Amazon → Gestisci contenuti e dispositivi, se vuoi rimuoverlo).
+
+## 9. Stem Separation (Demucs) e Subtitles (faster-whisper)
+- [ ] Al primo uso: avviso "needs the AI runtime" → **Install** → conferma con componenti e dimensioni (~2.5 GB) → barra di avanzamento.
+- [ ] Demucs: trascina una canzone, **Vocals + instrumental**, MP3 → due file in `Cartella\Stems\htdemucs\`. Prova anche **Fine-tuned** e **6 stems**.
+- [ ] Prima volta con un modello: chiede conferma del download del modello.
+- [ ] Subtitles: trascina un tuo video in italiano, modello **Large v3 Turbo**, lingua automatica, SRT → controlla tempi e testo; prova "Translate to English".
+- [ ] Velocità: con la 3060 Ti una trascrizione di 10 minuti dovrebbe richiedere ~1 minuto. Se dice "using CPU" o è molto lenta, dimmelo.
+
+## 10. Novità del giro di feedback
+- [ ] Ogni tool ha **Info** in alto a destra: cosa fa e da quali siti scarica.
+- [ ] Sidebar **Activity**: avvia un download di modelli o un'installazione e continua a usare altri tool; la barra in sidebar mostra l'avanzamento, clic → torni al tool.
+- [ ] Background Removal: **Ctrl+V** di un'immagine copiata (anche screenshot), o pulsante **Paste**; file copiati in Esplora + Ctrl+V.
+- [ ] Il batch mostra miniature con stato; un errore resta nel batch con **Copy error** (incollamelo in chat se succede) e Riprova.
+- [ ] Riprova il modello che ti dava `DmlFusedNode_19_64`: ora riprova da solo in "GPU (safe mode)" o "CPU" e lo scrive sul risultato.
+- [ ] Compare: avvialo e cambia tool, torna: i risultati ci sono ancora. Clic su un risultato → viewer con schede e ←/→ tra i modelli.
+- [ ] Zoom su tutti i prima/dopo (rotella, +/−, Fit, trascina per spostarti; doppio clic 1×/4×). In Upscale anche **Expand** nei Results.
+- [ ] Statistiche CPU/RAM/GPU sopra gli strumenti AI; Settings → "Show system stats" per nasconderle.
+- [ ] Gallery: elenco testuale di default (titolo/nome, tipo, risoluzione, data), "Show previews" per le miniature, filtri **Title contains / excludes**.
+- [ ] Gallery durante il download: in coda clic su "N files" → elenco file per file con ✓/✗ e motivo del server (es. 429, 403).
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.
 - MP4 Converted usa NVENC: funziona solo con GPU NVIDIA.
 - Upscale video: tutti i frame del video stanno su disco durante l'elaborazione (alcuni GB al minuto).
 - Gallery: file con lo stesso nome dentro la stessa galleria vengono selezionati/esclusi insieme.
+- Audible: togliere il DRM può violare i termini di Audible e la legge sul diritto d'autore (anche per uso personale). Usalo per i tuoi backup.
+- Runtime AI: ~4.5 GB su disco in `hermes-data\python` + i modelli in `hermes-data\models`.
 
 ## Test automatici (li lancio io; da sistemare quando vuoi)
 - `scripts/t3-test.mjs`: tutto ok tranne il controllo sul testo d'errore di ffmpeg.

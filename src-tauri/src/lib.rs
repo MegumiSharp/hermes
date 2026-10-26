@@ -1,9 +1,12 @@
+mod audible;
 mod binaries;
 mod cookies;
 mod eagle;
 mod net;
+mod python;
 mod queue;
 mod rembg;
+mod stats;
 mod update;
 
 use serde::{de::DeserializeOwned, Serialize};
@@ -67,7 +70,7 @@ fn save_settings(settings: Value) -> Result<(), String> {
 #[tauri::command]
 fn module_paths() -> Value {
     serde_json::json!({
-        "data": data_dir(), "bin": binaries::bin_dir(), "results": rembg::results_dir(),
+        "data": data_dir(), "bin": binaries::bin_dir(), "results": rembg::results_dir(), "python": python::dir(),
     })
 }
 
@@ -108,9 +111,10 @@ fn save_upload(request: tauri::ipc::Request<'_>) -> Result<String, String> {
     let name = request.headers().get("x-name").and_then(|v| v.to_str().ok()).unwrap_or("upload");
     let name = urlencoding_decode(name);
     let safe: String = name.chars().map(|c| if r#"\/:*?"<>|"#.contains(c) { '_' } else { c }).collect();
-    let dir = data_dir().join("uploads");
+    // own folder per drop: keeps the original file name (it ends up in output names and Eagle)
+    let dir = data_dir().join("uploads").join(now_ms().to_string());
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let path = dir.join(format!("{}-{safe}", now_ms()));
+    let path = dir.join(safe);
     fs::write(&path, bytes).map_err(|e| e.to_string())?;
     Ok(path.display().to_string())
 }
@@ -141,6 +145,17 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
+            // The window starts hidden so the frontend can restore its saved size/position first.
+            // Safety net: show it anyway if the frontend hasn't after 3 s.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(3));
+                if let Some(w) = tauri::Manager::get_webview_window(&handle, "main") {
+                    if !w.is_visible().unwrap_or(true) {
+                        w.show().ok();
+                    }
+                }
+            });
             rembg::cleanup_results();
             queue::start(app.handle().clone());
             Ok(())
@@ -165,6 +180,16 @@ pub fn run() {
             queue::queue_pause_all,
             queue::queue_clear_finished,
             queue::queue_resume_now,
+            audible::audible_status,
+            audible::audible_login_start,
+            audible::audible_login_finish,
+            audible::audible_logout,
+            audible::audible_library,
+            python::python_status,
+            python::python_install,
+            python::python_remove,
+            python::whisper_models,
+            stats::system_stats,
             rembg::rembg_models,
             rembg::rembg_download,
             rembg::rembg_delete,
