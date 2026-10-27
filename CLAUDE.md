@@ -16,15 +16,14 @@ Portable Windows utility app (no installer) for a content creator. Personal use,
   AI models update check (Binaries page), Thumbnail Tester.
 - **Rule: nothing long-running may block the UI.** No progress modals: use `startTask()` (activity.ts) so it shows
   on the Downloads page/badge; every tool stays usable meanwhile. Module state that must outlive navigation lives at module scope. Owner's manual test checklist: [docs/TEST-TODO.md](docs/TEST-TODO.md).
-- **Rule: every field/choice/pending list of every tool must survive closing the app** (`memory()` in core.ts,
-  or the module's prefs object saved on change; URLs re-probe on reopen). New tools must follow it.
+- **Rule: every field/choice/pending list of every tool must survive closing the app** (`memory()` in core.ts;
+  URLs re-probe on reopen). New tools must follow it.
 
 ## Open issues (fix only when the owner asks)
 - t3-test "failure keeps the tool's error": ffmpeg's final line is "Error opening input files: No such file or directory" (file name is on an earlier line). Decide: better error capture or relax the test.
 - t4-test stops at the 2nd download: after "Add to queue" the preview is only hidden, its `.t` stays in the DOM, so `addAndWait` skips re-fetching and clicks a disabled button. Test bug; MP4/1080p/Eagle/playlist paths of T4 not yet covered by the automated run.
 - t5-7-test gallery section: Wikimedia rate-limits this IP after repeated runs (429 → queue cooldown, test times out). Run with `ONLY=rembg,upscale` or point the gallery test at another source.
 - T14 not released yet: publishing needs the owner's go-ahead (`node scripts/release.mjs 0.6.0`).
-- Spotify/Gallery call `memory()` inside render: an async probe finishing after the tool was reopened saves the old state object over newer settings (fixed in thumbs.ts by moving state to module scope).
 - Hermes.exe needs the VC++ 2015-2022 runtime (MSVCP140.dll, from ONNX Runtime). Present on almost every PC.
 
 ## Conventions
@@ -41,7 +40,7 @@ Portable Windows utility app (no installer) for a content creator. Personal use,
 | File | Contents |
 |---|---|
 | `main.ts` | Entry. `Module` type `{id,name,icon,section:"tools"\|"system",render(view)}`, `modules[]` registry, `settings.hiddenTools` (`visible()`, `renderSidebar()`), `open(id)` (sets `.nav.on`, renders into `#view`, persists `settings.lastModule`), listens `hermes:open`, title-bar `#wc-min/#wc-max/#wc-close` (close flushes settings), window size/position in `settings.window` (window starts hidden, `restoreWindow()` then show; Rust shows it after 3 s as a fallback), `renderSettings` (`#data-path #open-data #update-status #check-update`, tool switches `[data-tool=id]`). Starts `startUpdateChecks()` + `startBinaryChecks()` |
-| `core.ts` | `settings`, `saveSettings(patch)`, `saveSettingsSoon(patch)` (300 ms debounce), `flushSettings()` (on close), `memory(key, defaults)` → `{state, save(soon?)}` (persisted module state), `navigate(id)`, `h(html)`, `banner({id,text(html),icon?,tone?:"accent"\|"warn",actions?})` → close (one per id, `[data-banner=id]` in `#banners`), `modal({title,body,actions?,onClose?})` → close (`actions: []` = none). `Action = {label,primary?,run?}`: `run` may be async, returning `false` keeps it open |
+| `core.ts` | `settings`, `saveSettings(patch)`, `saveSettingsSoon(patch)` (300 ms debounce), `flushSettings()` (on close), `memory(key, defaults)` → `{state, save(soon?)}` (persisted module state; **same object per key on every call**, so async work from an earlier visit never saves a stale copy; every tool uses it, incl. gallery/upscale/video `prefs`), `navigate(id)`, `h(html)`, `banner({id,text(html),icon?,tone?:"accent"\|"warn",actions?})` → close (one per id, `[data-banner=id]` in `#banners`), `modal({title,body,actions?,onClose?})` → close (`actions: []` = none). `Action = {label,primary?,run?}`: `run` may be async, returning `false` keeps it open |
 | `cookies.ts` | `cookieArgs(site)` → yt-dlp/gallery-dl args from `settings.cookies[site]` (`auto` = first of `detect_browsers`, Firefox preferred; `file` → `--cookies`), `cookieLabel(site)`, `isCookieError(msg)`, `markBroken(site)` (session: browser extraction failed → no cookies), `cookiesModal(site, reason?)` → Promise<changed> (source select `#ck-mode`, drop zone `.drop input`, result `.ck-result.ok/.bad`) |
 | `cookies-validate.ts` | Pure: `SITES` (youtube: domain, login cookie names), `validateCookies(text, site)` → `{ok,count,signedIn,expires,error}`. Imported by tests under plain node |
 | `activity.ts` | `startTask(id,label,module?)` → `{update(pct|null, detail), end()}`, `taskRunning(id)`, `mountTasks(el, meta)` (background tasks list on the Downloads page), `mountBadge(el)` (`.nav-badge(.busy)` on the Downloads nav: running + tasks, else queued), `mountToolDots(dotOf, current)` → refresh fn (`.nav-dot.working/.done/.failed`, done/failed cleared when that tool is opened) |
@@ -93,7 +92,7 @@ Config: `tauri.conf.json` (frameless 1180×760, `bundle.active=false`), `capabil
   removal incl. model download/compare/slider, upscale image + video), `node scripts/t8-11-test.mjs` (hidden tools,
   restart persistence, window state, Audible sign-in plumbing, AI runtime install, Demucs, Whisper; `ONLY=memory,audible,ai`),
   `node scripts/t12-test.mjs` (info buttons, stats, Eagle chip, paste, failed-item flow, compare across tools, viewer + zoom, gallery title filter),
-  `node scripts/t14-test.mjs` (dots, verify cache, queue_log, thumbnail cache, rembg gentle, AI models, Thumbnail Tester; `ONLY=dots,perf,rembg,models,thumbs`),
+  `node scripts/t14-test.mjs` (dots, verify cache, queue_log, thumbnail cache, rembg gentle, AI models, Thumbnail Tester; `ONLY=dots,perf,rembg,models,memory,thumbs`),
   `node scripts/t13-test.mjs` (Downloads page/badge, console, queue after tool switch, Clear, settings, converter, Image Upscale, video formats/Premiere/Mix, Spotify, gallery without previews; `ONLY=queue,converter,video,spotify,gallery`). **Run tests in the background; never block on them.**
   Tests open Hermes on the second monitor when one is connected (`launch()` writes `settings.window` if the test set none).
   Harness `scripts/smoke.mjs` exports `{ launch, connect, check, OUT }`; tests call backend commands with

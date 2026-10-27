@@ -2,7 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { binariesReady, toolStatus } from "../binaries";
 import { cookieArgs, cookieLabel, cookiesModal, isCookieError, markBroken } from "../cookies";
-import { banner, clearers, h, saveSettings, saveSettingsSoon, settings } from "../core";
+import { banner, clearers, h, memory } from "../core";
 import { icon } from "../icons";
 import { addJobs, mountQueue, NewJob, Step } from "../queue";
 import { eagleControls, folderField } from "./common";
@@ -122,11 +122,10 @@ function videoJob(v: Info, channel: string, p: Prefs, cookies: string[]): NewJob
 // ---------- module ----------
 
 export function renderVideo(view: HTMLElement) {
-  const prefs: Prefs = { format: "best", folder: "", eagle: true, url: "", premiere: false, wholeList: false, ...settings.video };
+  const { state: prefs, save } = memory<Prefs>("video", { format: "best", folder: "", eagle: true, url: "", premiere: false, wholeList: false });
   // pre-T13 format names
   if ((prefs.format as string) === "1080p") prefs.format = "1080";
   if ((prefs.format as string) === "mp4") Object.assign(prefs, { format: "best", premiere: true });
-  const save = (soon = false) => (soon ? saveSettingsSoon : saveSettings)({ video: prefs });
   clearers.set("video", () => { prefs.url = ""; save(); });
   let info: Info | null = null;
   let probing = 0; // id of the latest probe, so stale results are dropped

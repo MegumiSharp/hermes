@@ -29,10 +29,17 @@ export async function flushSettings() {
  * Module state that survives closing the app (SPEC: nothing typed or picked is ever lost).
  * Returns the stored object merged over `defaults`; call `save()` after changing it
  * (`save(true)` for typing, debounced).
+ * Same object for the same key on every call: async work started on an earlier visit to a tool
+ * (a probe, a download list) must not save a stale copy over what was changed since.
  */
+const memories = new Map<string, { state: any; save: (soon?: boolean) => void }>();
 export function memory<T extends object>(key: string, defaults: T): { state: T; save: (soon?: boolean) => void } {
-  const state = { ...defaults, ...settings[key] } as T;
-  return { state, save: (soon) => (soon ? saveSettingsSoon : saveSettings)({ [key]: state }) };
+  let m = memories.get(key);
+  if (!m) {
+    const state = { ...defaults, ...settings[key] } as T;
+    memories.set(key, (m = { state, save: (soon) => (soon ? saveSettingsSoon : saveSettings)({ [key]: state }) }));
+  }
+  return m;
 }
 
 /** What each tool's "Clear" button resets besides its queue (trays, results, URLs). Tools register

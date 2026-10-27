@@ -14,12 +14,13 @@ const FORMATS = {
   opus: { label: "Opus (original, no re-encode)", bitrate: "disable" },
 } as const;
 type Format = keyof typeof FORMATS;
+let probing = 0;
+let draw: (msg?: string) => void = () => {}; // the list of the Spotify page currently open
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
 
 export function renderSpotify(view: HTMLElement) {
   const { state, save } = memory("spotify", { url: "", folder: "", format: "mp3" as Format, songs: [] as Song[], listFile: "" });
   clearers.set("spotify", () => { Object.assign(state, { url: "", songs: [], listFile: "" }); save(); });
-  let probing = 0;
 
   const page = h(`<div class="page spotify">
     <div class="head"><div><h3>Spotify</h3><div class="sub">Songs, albums and playlists from Spotify links, matched on YouTube Music</div></div>
@@ -50,6 +51,7 @@ export function renderSpotify(view: HTMLElement) {
   fmt.value = state.format;
   fmt.onchange = () => { state.format = fmt.value as Format; save(); };
 
+  draw = renderList;
   function renderList(msg?: string) {
     list.hidden = !msg && !state.songs.length;
     add.disabled = !state.songs.length || !state.listFile;
@@ -73,7 +75,7 @@ export function renderSpotify(view: HTMLElement) {
     const id = ++probing;
     Object.assign(state, { url: u, songs: [], listFile: "" });
     save();
-    renderList("Reading the Spotify link");
+    draw("Reading the Spotify link");
     await binariesReady;
     const { data } = await paths;
     const name = `spotify-${Date.now()}.spotdl`;
@@ -84,9 +86,9 @@ export function renderSpotify(view: HTMLElement) {
       if (id !== probing) return;
       Object.assign(state, { songs, listFile: `${data}\\jobs\\${name}` });
       save();
-      renderList(songs.length ? undefined : "No songs found at this link.");
+      draw(songs.length ? undefined : "No songs found at this link.");
     } catch (e) {
-      if (id === probing) renderList(`Could not read this link: ${e}`);
+      if (id === probing) draw(`Could not read this link: ${e}`);
     }
   }
   $<HTMLFormElement>("#s-form").onsubmit = (e) => { e.preventDefault(); probe(); };

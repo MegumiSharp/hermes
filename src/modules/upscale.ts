@@ -1,7 +1,7 @@
 // Image Upscale module (SPEC 8): Real-ESRGAN ncnn-vulkan on the GPU. Videos live in Video Converter.
 import { invoke } from "@tauri-apps/api/core";
 import { binariesReady, toolStatus } from "../binaries";
-import { clearers, h, saveSettings, settings } from "../core";
+import { clearers, h, memory } from "../core";
 import { icon } from "../icons";
 import { addJobs, mountQueue, NewJob, Step } from "../queue";
 import { eagleControls, fileName, fileTray, folderField, paths, resultsPanel, statsBar, stem, TrayItem } from "./common";
@@ -16,11 +16,10 @@ type Prefs = { folder: string; eagle: boolean; model: string; scale: number; fil
 const IMAGES = ["png", "jpg", "jpeg", "webp"];
 
 export function renderUpscale(view: HTMLElement) {
-  const prefs: Prefs = { folder: "", eagle: true, model: "realesrgan-x4plus", scale: 4, tray: [], ...settings.upscale };
+  const { state: prefs, save } = memory<Prefs>("upscale", { folder: "", eagle: true, model: "realesrgan-x4plus", scale: 4, tray: [] });
   if (prefs.files?.length) { prefs.tray = prefs.files.map((path) => ({ path })); delete prefs.files; } // pre-T12 shape
   // videos used to be accepted here: they now belong to Video Converter
   prefs.tray = prefs.tray.filter((i) => IMAGES.some((e) => i.path.toLowerCase().endsWith(`.${e}`)));
-  const save = () => saveSettings({ upscale: prefs });
   clearers.set("upscale", () => { prefs.tray = []; save(); });
 
   const page = h(`<div class="page upscale">

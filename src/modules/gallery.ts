@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { toolStatus, binariesReady } from "../binaries";
 import { cookieArgs, cookieLabel, cookiesModal, isCookieError, markBroken } from "../cookies";
 import { SITES, siteForUrl } from "../cookies-validate";
-import { banner, clearers, h, saveSettings, saveSettingsSoon, settings } from "../core";
+import { banner, clearers, h, memory, saveSettingsSoon, settings } from "../core";
 import { icon } from "../icons";
 import { addJobs, mountQueue, Step } from "../queue";
 import { eagleControls, folderField, paths } from "./common";
@@ -91,9 +91,8 @@ function passes(i: Item, f: Filters): boolean {
 const filterExpr = (keys: string[]) => `(filename + '.' + extension) in {${keys.map((k) => JSON.stringify(k)).join(", ")}}`;
 
 export function renderGallery(view: HTMLElement) {
-  const prefs: Prefs = { folder: "", eagle: true, url: "", offKeys: [], previews: false, ...settings.gallery, filters: { ...DEFAULT_FILTERS, ...settings.gallery?.filters } };
-  prefs.filters.types = { ...DEFAULT_FILTERS.types, ...prefs.filters.types };
-  const save = (soon = false) => (soon ? saveSettingsSoon : saveSettings)({ gallery: prefs });
+  const { state: prefs, save } = memory<Prefs>("gallery", { folder: "", eagle: true, url: "", offKeys: [], previews: false, filters: DEFAULT_FILTERS });
+  prefs.filters = { ...DEFAULT_FILTERS, ...prefs.filters, types: { ...DEFAULT_FILTERS.types, ...prefs.filters.types } };
   /** Manual picks survive restarts: stored as the keys of the files turned off. */
   const saveOff = () => { prefs.offKeys = items.filter((i) => i.off).map((i) => i.key); save(); };
   let items: Item[] = [];

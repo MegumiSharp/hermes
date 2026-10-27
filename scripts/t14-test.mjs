@@ -1,7 +1,7 @@
 // T14 test: sidebar busy/done/failed dots, startup verify cache, logs out of queue snapshots,
 // cached thumbnails, Background Removal gentle mode, AI models check, Thumbnail Tester
 // (feed from a YouTube search, your thumbnails, every device, size view, channel fetch, restart).
-// Needs network. Usage: node scripts/t14-test.mjs   (ONLY=dots,perf,rembg,models,thumbs)
+// Needs network. Usage: node scripts/t14-test.mjs   (ONLY=dots,perf,rembg,models,memory,thumbs)
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
@@ -115,6 +115,26 @@ if (only("models")) {
   await until(async () => !(await page.$eval("#ai-check", (b) => b.disabled)), "AI models check finishes", 90000);
   check((await page.$$("#ai-rows [data-model]")).length === list.length || list.length === 0, "Binaries page lists the AI models");
   await page.screenshot({ path: join(OUT, "t14-models.png"), fullPage: true });
+}
+
+// ================= state shared across visits (a probe from an earlier visit must not save stale state) =================
+if (only("memory")) {
+  await open(page, "spotify");
+  await page.fill("#s-url", "https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT");
+  await page.click("#s-fetch");
+  await open(page, "converter");
+  await open(page, "spotify");
+  await page.selectOption("#s-format", "opus");
+  await until(async () => (await page.$$("#s-list .s-row")).length > 0, "song list shown on the reopened page", 120000);
+  await sleep(800);
+  const saved = JSON.parse(readFileSync(join(DATA, "settings.json"), "utf8")).spotify;
+  check(saved.format === "opus", `choice made after reopening kept when the old fetch finished (format: ${saved.format})`);
+  check(saved.songs?.length > 0, "fetched songs saved too");
+  await open(page, "video");
+  await page.fill("#v-url", "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  await open(page, "gallery");
+  await open(page, "video");
+  check((await page.$eval("#v-url", (i) => i.value)).includes("dQw4w9WgXcQ"), "Video Downloader link kept across visits");
 }
 
 // ================= Thumbnail Tester =================

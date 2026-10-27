@@ -3,7 +3,7 @@
 //   [exe][file bytes...][manifest json][u64 LE manifest length]["HERMESPK"]
 // Downloads are cached in vendor/<id>/ and refreshed when a newer release exists.
 import { execFileSync } from "node:child_process";
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 
 const tools = JSON.parse(readFileSync("src-tauri/binaries.json", "utf8"));
@@ -84,14 +84,17 @@ async function fetchTool(t) {
 const exe = "src-tauri/target/release/Hermes.exe";
 const out = "release/Hermes.exe";
 mkdirSync("release", { recursive: true });
-copyFileSync(exe, out);
 const manifest = { tools: {}, files: [] };
-let offset = statSync(out).size;
+for (const t of tools) manifest.tools[t.id] = await fetchTool(t);
+// one handle from start to end: reopening the freshly written exe races antivirus scans (EBUSY)
+const fd = openSync(out, "w");
+const base = readFileSync(exe);
+writeSync(fd, base);
+let offset = base.length;
 for (const t of tools) {
-  manifest.tools[t.id] = await fetchTool(t);
   for (const f of t.files) {
     const data = readFileSync(join("vendor", t.id, f));
-    appendFileSync(out, data);
+    writeSync(fd, data);
     manifest.files.push({ name: f, offset, size: data.length });
     offset += data.length;
   }
@@ -99,5 +102,6 @@ for (const t of tools) {
 const json = Buffer.from(JSON.stringify(manifest));
 const len = Buffer.alloc(8);
 len.writeBigUInt64LE(BigInt(json.length));
-appendFileSync(out, Buffer.concat([json, len, Buffer.from("HERMESPK")]));
+writeSync(fd, Buffer.concat([json, len, Buffer.from("HERMESPK")]));
+closeSync(fd);
 console.log(`packed ${out} (${(statSync(out).size / 1048576).toFixed(0)} MB):`, Object.entries(manifest.tools).map(([k, v]) => `${k} ${v.version}`).join(", "));

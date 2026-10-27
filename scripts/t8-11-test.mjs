@@ -50,7 +50,7 @@ rmSync(W, { recursive: true, force: true });
 mkdirSync(W, { recursive: true });
 rmSync(join(DATA, "queue.json"), { force: true });
 writeFileSync(join(DATA, "settings.json"), JSON.stringify({
-  lastModule: "settings", autoUpdateYtdlp: false, window: { x: 120, y: 90, width: 1100, height: 720, maximized: false },
+  lastModule: "settings", autoUpdateYtdlp: false, cookies: { youtube: "none" }, window: { x: 120, y: 90, width: 1100, height: 720, maximized: false },
   demucs: { folder: W }, whisper: { folder: W, model: "base", formats: ["srt", "txt"] },
 }));
 let app = await launch(EXE);
@@ -60,7 +60,8 @@ let page = app.page;
 if (only("memory")) {
   const [x, y, w] = await page.evaluate(() => [window.screenX, window.screenY, Math.round(window.innerWidth * devicePixelRatio)]);
   check(Math.abs(x - 120) < 20 && Math.abs(y - 90) < 40 && Math.abs(w - 1100) < 20, `window restored at saved position/size (${x},${y} ${w}px)`);
-  check(await page.$$eval(".nav", (n) => n.length) === 9, "7 tools + Binaries + Settings in the sidebar");
+  const navs = await page.$$eval(".nav", (n) => n.map((x) => x.dataset.id));
+  check(navs.length === 13, `10 tools + Downloads + Binaries + Settings in the sidebar (${navs.join(", ")})`);
   await page.uncheck('[data-tool="upscale"]');
   check(!(await page.$('.nav[data-id="upscale"]')), "hiding Upscale removes it from the sidebar");
   check(settingsFile().hiddenTools.includes("upscale"), "hidden tools saved");
