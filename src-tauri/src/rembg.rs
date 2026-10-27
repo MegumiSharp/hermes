@@ -72,6 +72,13 @@ fn model_path(m: &Model) -> PathBuf {
     models_dir().join(m.file)
 }
 
+/// Installed models: (id, display name, release file name, local path).
+pub fn installed() -> Vec<(&'static str, &'static str, &'static str, PathBuf)> {
+    MODELS.iter().filter(|m| model_path(m).exists()).map(|m| (m.id, m.name, m.file, model_path(m))).collect()
+}
+
+pub const RELEASE_API: &str = "https://api.github.com/repos/danielgatis/rembg/releases/tags/v0.0.0";
+
 /// Where module results live (kept for the before/after preview after Eagle import).
 pub fn results_dir() -> PathBuf {
     let d = data_dir().join("results");
@@ -82,7 +89,8 @@ pub fn results_dir() -> PathBuf {
 /// Deletes preview results older than 7 days.
 pub fn cleanup_results() {
     let week = Duration::from_secs(7 * 24 * 3600);
-    for e in fs::read_dir(results_dir()).into_iter().flatten().flatten() {
+    let dirs = [results_dir(), data_dir().join("thumbs")];
+    for e in dirs.iter().flat_map(|d| fs::read_dir(d).into_iter().flatten().flatten()) {
         let old = e.metadata().and_then(|m| m.modified()).is_ok_and(|t| SystemTime::now().duration_since(t).unwrap_or_default() > week);
         if old {
             fs::remove_file(e.path()).ok();
@@ -118,6 +126,9 @@ enum Mode {
     Gpu,
     GpuSafe,
     Cpu,
+    /// "Gentle" setting: CPU on 2 threads only. Slower, but leaves the GPU (desktop, video) and
+    /// most cores free, so the PC stays smooth.
+    Gentle,
 }
 
 impl Mode {
@@ -125,7 +136,7 @@ impl Mode {
         match self {
             Mode::Gpu => Some(Mode::GpuSafe),
             Mode::GpuSafe => Some(Mode::Cpu),
-            Mode::Cpu => None,
+            Mode::Cpu | Mode::Gentle => None,
         }
     }
     pub fn label(self) -> &'static str {
@@ -133,6 +144,7 @@ impl Mode {
             Mode::Gpu => "GPU",
             Mode::GpuSafe => "GPU (safe mode)",
             Mode::Cpu => "CPU",
+            Mode::Gentle => "CPU (gentle)",
         }
     }
 }
@@ -159,11 +171,12 @@ fn load(m: &'static Model, mode: Mode) -> Result<Session, String> {
             .map_err(e)?
             .with_execution_providers([ep::DirectML::default().build().error_on_failure(), ep::CPU::default().build()])
             .map_err(e)?,
-        Mode::Cpu => b.with_execution_providers([ep::CPU::default().build()]).map_err(e)?,
+        Mode::Cpu | Mode::Gentle => b.with_execution_providers([ep::CPU::default().build()]).map_err(e)?,
     };
     // leave half the cores free so the PC stays responsive (CPU work: fallback mode + graph ops)
     let cores = std::thread::available_parallelism().map_or(4, |n| n.get());
-    b = b.with_intra_threads((cores / 2).max(1)).map_err(e)?;
+    let threads = if mode == Mode::Gentle { 2 } else { (cores / 2).max(1) };
+    b = b.with_intra_threads(threads).map_err(e)?.with_inter_threads(1).map_err(e)?;
     if mode == Mode::GpuSafe {
         b = b.with_optimization_level(GraphOptimizationLevel::Level1).map_err(e)?; // no node fusion
     }
@@ -184,7 +197,7 @@ fn open_image(path: &str) -> Result<DynamicImage, String> {
 }
 
 /// Alpha mask (0-255) at the image's size, plus the device that produced it.
-fn predict(m: &'static Model, img: &DynamicImage) -> Result<(GrayImage, Mode), String> {
+fn predict(m: &'static Model, img: &DynamicImage, gentle: bool) -> Result<(GrayImage, Mode), String> {
     let s = m.kind.size();
     let rgb = img.resize_exact(s, s, FilterType::Lanczos3).to_rgb8();
     let max = rgb.as_raw().iter().copied().max().unwrap_or(255).max(1) as f32; // rembg divides by the max pixel
@@ -199,7 +212,7 @@ fn predict(m: &'static Model, img: &DynamicImage) -> Result<(GrayImage, Mode), S
     let shape = [1usize, 3, s as usize, s as usize];
 
     let mut guard = SESSION.lock().unwrap_or_else(|e| e.into_inner());
-    let mut mode = WORKING_MODE.lock().unwrap().get(m.id).copied().unwrap_or(Mode::Gpu);
+    let mut mode = if gentle { Mode::Gentle } else { WORKING_MODE.lock().unwrap().get(m.id).copied().unwrap_or(Mode::Gpu) };
     let raw: Vec<f32> = loop {
         let attempt = (|| {
             if guard.as_ref().is_none_or(|(id, md, _)| *id != m.id || *md != mode) {
@@ -223,7 +236,9 @@ fn predict(m: &'static Model, img: &DynamicImage) -> Result<(GrayImage, Mode), S
             },
         }
     };
-    WORKING_MODE.lock().unwrap().insert(m.id, mode);
+    if mode != Mode::Gentle {
+        WORKING_MODE.lock().unwrap().insert(m.id, mode); // gentle is a choice, not a capability
+    }
     let pred: Vec<f32> = raw.iter().map(|&v| if m.kind == Kind::BiRefNet { 1.0 / (1.0 + (-v).exp()) } else { v }).collect();
     let (lo, hi) = pred.iter().fold((f32::MAX, f32::MIN), |(a, b), &v| (a.min(v), b.max(v)));
     let range = (hi - lo).max(1e-6);
@@ -272,18 +287,50 @@ fn lower_thread_priority() {
 }
 
 /// Queue step entry point: input image -> PNG cut-out at `output`. Returns the device used.
-pub async fn remove(model_id: &str, input: &str, output: &str, background: &str, crop: bool) -> Result<&'static str, String> {
+pub async fn remove(model_id: &str, input: &str, output: &str, background: &str, crop: bool, gentle: bool) -> Result<&'static str, String> {
     let m = model(model_id)?;
     let (input, output, background) = (input.to_string(), output.to_string(), background.to_string());
     tauri::async_runtime::spawn_blocking(move || {
         lower_thread_priority();
         let img = open_image(&input)?;
-        let (mask, mode) = predict(m, &img)?;
+        let (mask, mode) = predict(m, &img, gentle)?;
         if let Some(dir) = PathBuf::from(&output).parent() {
             fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         }
         compose(&img, &mask, &background, crop).save(&output).map_err(|e| e.to_string())?;
         Ok(mode.label())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Small cached JPEG (max 320 px) of an image for trays and result strips, so the UI never decodes
+/// 20-megapixel originals just to show a card. Cache key = path + size + mtime.
+#[tauri::command]
+pub async fn thumbnail(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use std::hash::{Hash, Hasher};
+        let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (path.as_str(), meta.len(), meta.modified().ok()).hash(&mut h);
+        let dir = data_dir().join("thumbs");
+        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let out = dir.join(format!("{:016x}.jpg", h.finish()));
+        if !out.exists() {
+            lower_thread_priority();
+            let img = open_image(&path)?.thumbnail(320, 320);
+            // JPEG has no alpha: flatten cut-outs on a neutral grey so they stay readable
+            let mut bg = image::RgbImage::from_pixel(img.width(), img.height(), image::Rgb([40, 40, 44]));
+            for (x, y, p) in img.to_rgba8().enumerate_pixels() {
+                let a = p[3] as u32;
+                let d = bg.get_pixel_mut(x, y);
+                for c in 0..3 {
+                    d[c] = ((p[c] as u32 * a + d[c] as u32 * (255 - a)) / 255) as u8;
+                }
+            }
+            bg.save(&out).map_err(|e| e.to_string())?;
+        }
+        Ok(out.display().to_string())
     })
     .await
     .map_err(|e| e.to_string())?
@@ -351,13 +398,14 @@ pub struct CompareResult {
 /// Runs several models on one image for the compare grid. Results go to hermes-data/results.
 /// Emits "rembg-compare" with each result as it finishes, so the UI fills in progressively.
 #[tauri::command]
-pub async fn rembg_compare(app: AppHandle, input: String, models: Vec<String>) -> Vec<CompareResult> {
+pub async fn rembg_compare(app: AppHandle, input: String, models: Vec<String>, gentle: Option<bool>) -> Vec<CompareResult> {
+    let gentle = gentle.unwrap_or(false);
     let stem = PathBuf::from(&input).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
     let mut out = vec![];
     for id in models {
         let output = results_dir().join(format!("{stem}-{id}-{}.png", now_ms())).display().to_string();
         let t = Instant::now();
-        let r = remove(&id, &input, &output, "", false).await;
+        let r = remove(&id, &input, &output, "", false, gentle).await;
         let res = CompareResult {
             model: id,
             output,

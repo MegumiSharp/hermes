@@ -198,7 +198,7 @@ if (only("spotify")) {
   const j = await nextJobDone(page, "spotify", 600000);
   const mp3 = readdirSync(S).find((f) => f.endsWith(".mp3"));
   check(!!mp3 && /Rick Astley/.test(mp3), `song downloaded: ${mp3}`);
-  check(j.log.some((l) => l.includes("spotdl")), "console shows spotDL output");
+  check((await invoke(page, "queue_log", { id: j.id })).some((l) => l.includes("spotdl")), "console shows spotDL output");
 }
 
 // ================= Gallery without previews =================

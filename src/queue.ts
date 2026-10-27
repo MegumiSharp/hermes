@@ -9,7 +9,7 @@ export type Step =
   | { type: "run"; label: string; bin: string; args: string[]; parser: "ytDlp" | "ffmpeg" | "plain" | "galleryDl" | "percent" | "spotDl"; outputs?: string[]; duration?: number; replace?: boolean }
   | { type: "eagle"; keep?: boolean }
   | { type: "delete"; paths: string[] }
-  | { type: "rembg"; model: string; input: string; output: string; background?: string; crop?: boolean }
+  | { type: "rembg"; model: string; input: string; output: string; background?: string; crop?: boolean; gentle?: boolean }
   | { type: "audible"; asin: string; title: string; author: string; duration: number; folder: string };
 export type EagleMeta = { website?: string; tags?: string[]; annotation?: string };
 export type NewJob = {
@@ -22,8 +22,9 @@ export type Job = {
   id: string; module: string; title: string; pill: string; parent: string | null; group: boolean;
   steps: Step[]; step: number; state: State; progress: number; detail: string; error: string;
   outputs: string[]; inEagle: boolean; source: string; note: string;
-  log: string[]; // console output of the job's tools
 };
+/** Console lines per job, fetched when a console opens and then appended live. */
+const logs = new Map<string, string[]>();
 type Queue = { jobs: Job[]; pausedUntil: number; backoffMin: number; pausedAll: boolean };
 
 let queue: Queue = await invoke("queue_get");
@@ -86,10 +87,10 @@ listen<{ id: string; progress: number; detail: string }>("job", ({ payload: p })
 });
 // console lines, appended live to open consoles (auto-scroll unless the user scrolled up)
 listen<{ id: string; line: string }>("job-log", ({ payload: p }) => {
-  const j = queue.jobs.find((x) => x.id === p.id);
-  if (!j) return;
-  (j.log ??= []).push(p.line);
-  if (j.log.length > 400) j.log.shift();
+  const lines = logs.get(p.id);
+  if (!lines) return; // console never opened: nothing to keep in the UI
+  lines.push(p.line);
+  if (lines.length > 400) lines.shift();
   document.querySelectorAll<HTMLElement>(`[data-job="${p.id}"] > .console`).forEach((c) => {
     const atEnd = c.scrollTop + c.clientHeight >= c.scrollHeight - 8;
     c.append(logLine(p.line));
@@ -208,10 +209,14 @@ function item(j: Job, showModule: boolean): HTMLElement {
   } else if (open) {
     // terminal-like view of the tool's output: what it is downloading, warnings, server errors
     const c = h(`<div class="console mono" tabindex="0"></div>`);
-    const lines = j.log ?? [];
-    c.append(...(lines.length ? lines.map(logLine) : [logLine(state === "queued" ? "Waiting for a free slot…" : "No output yet")]));
+    const fill = (lines: string[]) => {
+      c.replaceChildren(...(lines.length ? lines.map(logLine) : [logLine(state === "queued" ? "Waiting for a free slot…" : "No output yet")]));
+      requestAnimationFrame(() => (c.scrollTop = c.scrollHeight));
+    };
+    const cached = logs.get(j.id);
+    if (cached) fill(cached);
+    else invoke<string[]>("queue_log", { id: j.id }).then((l) => { logs.set(j.id, l); fill(l); });
     el.append(c);
-    requestAnimationFrame(() => (c.scrollTop = c.scrollHeight));
   }
   return el;
 }

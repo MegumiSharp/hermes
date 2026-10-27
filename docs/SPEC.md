@@ -210,6 +210,26 @@ hermes-data/
 - Models large-v3-turbo (default), large-v3, medium, small, base. Language auto or chosen; transcribe or
   translate to English; SRT / VTT / TXT. GPU float16 with CPU int8 fallback.
 
+## 14. Thumbnail Tester (T14)
+
+- Feed of real videos from `yt-dlp ytsearch30:<topic>` (random topic on first open, dice = new topic); other channels' avatars
+  fetched one by one from their channel pages and remembered. Upload dates are not in search results: a stable fake age per video.
+- Your thumbnails (drop/browse/paste, several = A/B variants with show/hide), title (100 max, warning over 60), duration,
+  views, upload age, search description; channel link → name, avatar, subscribers.
+- Devices: desktop home grid, search results, up-next sidebar, mobile phone frame; dark/light; checks B/W, squint (blur),
+  watched bars, outline yours; shuffle/reset positions. Size view: 640/360/246/168/120 px; warns under 1280×720 or not 16:9.
+- Everything (thumbnails, fields, feed, view) survives a restart.
+
+## 15. Activity dots and performance (T14)
+
+- Sidebar dot per tool: pulsing amber while it has running/queued jobs or background tasks, green when finished and red when
+  failed until that tool is opened.
+- Background Removal performance: Fast (GPU ladder) or Gentle (CPU, 2 threads, PC stays usable). Startup tool verification is
+  cached by size+mtime (`bin/verified.json`); job console logs are fetched on demand (`queue_log`), not in queue snapshots;
+  tray/compare previews use cached 320 px JPEGs (`hermes-data/thumbs`, 7 days); tray redraws only progress on ticks.
+- Binaries → AI models: rembg model files vs the release's asset sizes, Whisper models vs the Hugging Face sha (Update re-downloads);
+  Python packages vs PyPI, informational (pinned).
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.

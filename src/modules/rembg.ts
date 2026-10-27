@@ -1,13 +1,13 @@
 // Background Removal module (SPEC 7). Backend: src-tauri/src/rembg.rs (ONNX Runtime + DirectML).
 // State lives at module level (not per render): a compare keeps running and its results stay when
 // you switch tools; everything is also persisted in settings.json.
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { startTask, taskRunning } from "../activity";
 import { banner, clearers, h, memory, modal } from "../core";
 import { icon } from "../icons";
 import { addJobs, mountQueue, Step } from "../queue";
-import { eagleControls, fileName, fileTray, folderField, resultsPanel, resultViewer, statsBar, stem, TrayItem } from "./common";
+import { eagleControls, fileName, fileTray, folderField, resultsPanel, resultViewer, statsBar, stem, thumbSrc, TrayItem } from "./common";
 
 type Model = { id: string; name: string; mb: number; speed: string; useCase: string; installed: boolean };
 type CompareResult = { model: string; output: string; ms: number; device: string; error: string | null };
@@ -16,7 +16,7 @@ const EXTS = ["png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff"];
 const gb = (mb: number) => (mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`);
 
 const { state, save } = memory("rembg", {
-  folder: "", eagle: true, model: "birefnet-general", background: "", crop: false, compare: [] as string[],
+  folder: "", eagle: true, model: "birefnet-general", background: "", crop: false, gentle: false, compare: [] as string[],
   batch: [] as TrayItem[], compareFile: [] as TrayItem[], mode: "batch" as "batch" | "compare", results: [] as CompareResult[],
   files: undefined as string[] | undefined, // pre-T12 shape, migrated below
 });
@@ -145,7 +145,10 @@ export function renderRembg(view: HTMLElement) {
       <div><div class="field-label">Models to compare</div><div class="r-pick" id="r-pick"></div></div>
       <div class="r-grid" id="r-grid"></div>
     </section>
-    <div class="opts one" id="r-dest"></div>
+    <div class="opts"><div class="opt"><span class="field-label">Performance</span><select class="select" id="r-perf">
+      <option value="fast">Fast (GPU): quickest, the PC may feel slower while it works</option>
+      <option value="gentle">Gentle (CPU, 2 cores): slower, the PC stays smooth</option></select></div>
+      <div id="r-dest"></div></div>
     <div class="row2"><button class="btn primary" id="r-go" disabled>${icon("scissors")}Remove backgrounds</button></div>
   </div>`);
   const $ = <T extends HTMLElement>(s: string) => page.querySelector<T>(s)!;
@@ -190,6 +193,9 @@ export function renderRembg(view: HTMLElement) {
   const crop = $<HTMLInputElement>("#r-crop");
   crop.checked = state.crop;
   crop.onchange = () => { state.crop = crop.checked; save(); };
+  const perf = $<HTMLSelectElement>("#r-perf");
+  perf.value = state.gentle ? "gentle" : "fast";
+  perf.onchange = () => { state.gentle = perf.value === "gentle"; save(); };
 
   // ----- inputs -----
   const batch = fileTray({ id: "r-drop", label: "Drop images here", exts: EXTS, multiple: true, paste: true },
@@ -237,7 +243,7 @@ export function renderRembg(view: HTMLElement) {
       const todo = batch.pending();
       const modelName = models.find((m) => m.id === state.model)?.name ?? state.model;
       const jobs = await Promise.all(todo.map(async (it) => {
-        const steps: Step[] = [{ type: "rembg", model: state.model, input: it.path, output: outputFor(it.path, "nobg"), background: state.background, crop: state.crop }];
+        const steps: Step[] = [{ type: "rembg", model: state.model, input: it.path, output: outputFor(it.path, "nobg"), background: state.background, crop: state.crop, gentle: state.gentle }];
         if (state.eagle) steps.push({ type: "eagle", keep: true });
         return { module: "rembg", title: fileName(it.path), pill: modelName, steps, source: it.path, eagle: { tags: ["Background removed"] } };
       }));
@@ -252,7 +258,7 @@ export function renderRembg(view: HTMLElement) {
     redraw();
     const task = startTask("rembg-compare", `Comparing ${comparing.models.length} models`, "rembg");
     try {
-      await invoke("rembg_compare", { input, models: comparing.models });
+      await invoke("rembg_compare", { input, models: comparing.models, gentle: state.gentle });
     } finally {
       comparing = null;
       task.end();
@@ -278,8 +284,7 @@ export function renderRembg(view: HTMLElement) {
           cell.title = "Click to copy the error";
         } else {
           const img = h(`<img alt="">`) as HTMLImageElement;
-          img.src = convertFileSrc(r.output);
-          img.onerror = () => cell.remove(); // cleaned up (older than 7 days)
+          thumbSrc(r.output).then((s) => (img.src = s), () => cell.remove()); // cleaned up (older than 7 days)
           cell.querySelector(".r-img")!.append(img);
           cell.onclick = () => openViewer(i);
         }

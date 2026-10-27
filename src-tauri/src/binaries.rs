@@ -198,6 +198,32 @@ fn extract(t: &Tool, p: &Payload) -> Result<(), String> {
     set_installed(&t.id, ver.clone())
 }
 
+/// Size + modified time of a tool's main file: if unchanged since it last verified, skip running it.
+fn fingerprint(t: &Tool) -> Option<String> {
+    let m = fs::metadata(bin_dir().join(&t.files[0])).ok()?;
+    let mtime = m.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?.as_secs();
+    Some(format!("{}:{mtime}", m.len()))
+}
+
+/// Startup check without launching six Python-based exes every time (seconds of CPU):
+/// a tool is re-verified only when its file changed or a sibling file went missing.
+fn verify_cached(t: &Tool) -> Result<String, String> {
+    let cache_path = bin_dir().join("verified.json");
+    let mut cache: HashMap<String, String> = read_json(&cache_path).unwrap_or_default();
+    let fp = fingerprint(t);
+    let present = t.files.iter().all(|f| bin_dir().join(f).exists());
+    if present && fp.is_some() && cache.get(&t.id) == fp.as_ref() {
+        return Ok(String::new());
+    }
+    let r = verify(t);
+    match (&r, fp) {
+        (Ok(_), Some(fp)) => drop(cache.insert(t.id.clone(), fp)),
+        _ => drop(cache.remove(&t.id)),
+    }
+    write_json(&cache_path, &cache).ok();
+    r
+}
+
 /// Runs the tool's version command; Ok(first output line).
 fn verify(t: &Tool) -> Result<String, String> {
     let exe = bin_dir().join(&t.files[0]);
@@ -258,7 +284,7 @@ pub async fn binaries_init() -> Vec<Status> {
                         extract(t, p).ok();
                     }
                 }
-                let mut check = verify(t);
+                let mut check = verify_cached(t);
                 if check.is_err() {
                     if let Some(p) = &p {
                         if extract(t, p).is_ok() {

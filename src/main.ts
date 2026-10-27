@@ -6,7 +6,7 @@ import { availableMonitors, getCurrentWindow, PhysicalPosition, PhysicalSize } f
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { icon, IconName } from "./icons";
 import { clearers, flushSettings, h, modal, settings, saveSettings, saveSettingsSoon } from "./core";
-import { mountBadge, mountTasks } from "./activity";
+import { mountBadge, mountTasks, mountToolDots } from "./activity";
 import { mountQueue, setModuleNames } from "./queue";
 import { checkForUpdate, startUpdateChecks } from "./update";
 import { renderBinaries, startBinaryChecks } from "./binaries";
@@ -19,6 +19,7 @@ import { renderConverter } from "./modules/converter";
 import { renderAudible } from "./modules/audible";
 import { renderDemucs } from "./modules/demucs";
 import { renderWhisper } from "./modules/whisper";
+import { renderThumbs } from "./modules/thumbs";
 
 type Info = { about: string; sources?: string[]; formats?: string; engine: string; link?: string };
 type Module = {
@@ -99,6 +100,14 @@ const modules: Module[] = [
       about: "Downloads the audiobooks you own as M4B files with chapters and cover, playable in any player. You sign in on Amazon's own page; Hermes never sees your password.",
       sources: ["Audible marketplaces: Italy, US, UK, Germany, France, Spain, Canada, Australia, India, Japan, Brazil"],
       engine: "audible-cli + FFmpeg",
+    },
+  },
+  {
+    id: "thumbs", name: "Thumbnail Tester", icon: "monitorPlay", section: "tools", render: renderThumbs,
+    info: {
+      about: "Previews your thumbnails and titles in a realistic YouTube feed next to real videos of your niche: home grid, search results, up-next sidebar and mobile, dark or light. Size view shows every size YouTube uses; B/W and Squint test legibility.",
+      sources: ["Feed videos: a YouTube search of your niche (or a random topic)", "Your channel name and avatar from its link"],
+      formats: "PNG, JPG, WebP thumbnails. Paste with Ctrl+V.", engine: "yt-dlp (search and channel info)",
     },
   },
   { id: "downloads", name: "Downloads", icon: "list", section: "system", render: renderDownloads },
@@ -239,6 +248,7 @@ function open(id: string) {
     attach();
   }
   if (settings.lastModule !== mod.id) saveSettings({ lastModule: mod.id });
+  refreshDots?.(); // opening a tool marks its finished/failed work as seen
 }
 
 // ---------- sidebar ----------
@@ -250,7 +260,7 @@ function renderSidebar() {
   for (const section of ["tools", "system"] as const) {
     side.append(section === "tools" ? h(`<div class="label">Tools</div>`) : h(`<div class="spacer"></div>`));
     for (const m of visible().filter((m) => m.section === section)) {
-      const n = h(`<button class="nav ${m.id === current ? "on" : ""}" data-id="${m.id}">${icon(m.icon)}<span>${m.name}</span></button>`);
+      const n = h(`<button class="nav ${m.id === current ? "on" : ""}" data-id="${m.id}">${icon(m.icon)}<span>${m.name}</span>${m.section === "tools" ? `<i class="nav-dot"></i>` : ""}</button>`);
       n.onclick = () => open(m.id);
       if (m.id === "downloads") n.append(badge);
       side.append(n);
@@ -258,6 +268,7 @@ function renderSidebar() {
   }
 }
 renderSidebar();
+const refreshDots = mountToolDots((id) => side.querySelector<HTMLElement>(`.nav[data-id="${id}"] .nav-dot`), () => current);
 
 // ---------- window: title bar + size/position remembered in settings.json (portable) ----------
 const win = getCurrentWindow();

@@ -2,6 +2,7 @@ mod audible;
 mod binaries;
 mod cookies;
 mod eagle;
+mod models;
 mod net;
 mod python;
 mod queue;
@@ -192,6 +193,7 @@ pub fn run() {
             queue::queue_clear_finished,
             queue::queue_resume_now,
             queue::queue_clear_module,
+            queue::queue_log,
             audible::audible_status,
             audible::audible_login_start,
             audible::audible_login_finish,
@@ -206,6 +208,9 @@ pub fn run() {
             rembg::rembg_download,
             rembg::rembg_delete,
             rembg::rembg_compare,
+            rembg::thumbnail,
+            models::models_status,
+            models::model_update,
             module_paths,
             write_job_file,
             save_upload,

@@ -136,6 +136,54 @@ export function renderBinaries(view: HTMLElement) {
       return row;
     }));
   };
+  el.append(aiModelsCard());
   view.append(el);
   rerender();
+}
+
+type ModelStatus = { kind: string; id: string; name: string; installed: string; latest: string; outdated: boolean; note: string };
+
+/** "AI models": are downloaded models / AI packages current? Update runs in the background. */
+function aiModelsCard(): HTMLElement {
+  const card = h(`<div class="card" id="ai-models"><div class="row"><div><div class="v"><b>AI models</b></div>
+    <div class="sub">Background Removal models, Whisper models and the AI runtime packages. Checked on demand.</div></div>
+    <button class="btn sm" id="ai-check">${icon("refresh")}Check models</button></div><div id="ai-rows"></div></div>`);
+  const rows = card.querySelector<HTMLElement>("#ai-rows")!;
+  const btn = card.querySelector<HTMLButtonElement>("#ai-check")!;
+  async function check() {
+    btn.disabled = true;
+    rows.replaceChildren(h(`<div class="row"><div class="sub">Checking</div></div>`));
+    const list = await invoke<ModelStatus[]>("models_status");
+    btn.disabled = false;
+    if (!list.length) { rows.replaceChildren(h(`<div class="row"><div class="sub">No AI models downloaded yet.</div></div>`)); return; }
+    rows.replaceChildren(...list.map((m) => {
+      const r = h(`<div class="row" data-model="${m.kind}-${m.id}"><div class="bin-name"><div class="v"><b></b></div><div class="mono sub"></div></div>
+        <div class="bin-state"><span class="chip ${m.outdated ? "bad" : ""}"><span class="dot"></span><span></span></span></div>
+        <div class="bin-latest sub"></div><div class="bin-act"></div></div>`);
+      r.querySelector("b")!.textContent = m.name;
+      r.querySelector(".bin-name .sub")!.textContent = m.installed;
+      r.querySelector(".chip span:last-child")!.textContent = m.outdated ? "Update available" : m.latest === "unknown" ? "Not checked" : "Up to date";
+      r.querySelector(".bin-latest")!.textContent = m.note || (m.outdated ? `Latest ${m.latest}` : "");
+      if (m.outdated && m.kind !== "python") {
+        const u = h(`<button class="btn sm primary">${icon("download")}Update</button>`) as HTMLButtonElement;
+        u.onclick = async () => {
+          u.disabled = true;
+          const task = startTask(`model-update-${m.id}`, `Updating ${m.name}`, "binaries");
+          try {
+            await invoke("model_update", { kind: m.kind, id: m.id });
+            banner({ id: "ai-models", icon: "check", text: `${m.name} updated.` });
+          } catch (e) {
+            banner({ id: "ai-models", tone: "warn", icon: "alert", text: `Update failed: ${e}` });
+          } finally {
+            task.end();
+            check();
+          }
+        };
+        r.querySelector(".bin-act")!.append(u);
+      }
+      return r;
+    }));
+  }
+  btn.onclick = check;
+  return card;
 }

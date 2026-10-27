@@ -104,6 +104,17 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] **Video Converter**: converti in MP4/H.265/ProRes/WebM/GIF/MP3/WAV, cambia risoluzione (anche ingrandire a 1080p/4K), fps e qualità.
 - [ ] Gallery: con "Show previews" spento non compare nessun elenco, solo il riepilogo; il dettaglio file per file è nella console dell'elemento in coda.
 
+## 12. Novità (giro 3)
+- [ ] **Pallino nella sidebar** accanto a ogni tool: giallo lampeggiante mentre lavora, verde quando ha finito, rosso se qualcosa è fallito. Sparisce quando apri quel tool.
+- [ ] Background Removal → **Performance**: *Fast (GPU)* come prima, *Gentle* usa la CPU con 2 core (più lento, ma il PC resta usabile mentre lavori o monti). Prova un batch grande in Fast e dimmi se l'app ora resta fluida.
+- [ ] L'app in generale: avvio più veloce (gli strumenti vengono verificati solo se cambiano), anteprime delle immagini più leggere, coda più leggera (la console si carica solo quando la apri).
+- [ ] Binaries → **AI models → Check models**: dice se i modelli scaricati (Background Removal, Whisper) hanno una versione nuova, con **Update**. PyTorch/Demucs/faster-whisper sono informativi: si aggiornano con Hermes.
+- [ ] **Thumbnail Tester** (nuovo tool): appena lo apri carica video veri da una ricerca YouTube a caso (dado = altro argomento, oppure scrivi la tua nicchia → Search).
+  - Trascina/incolla una o più thumbnail, scrivi il titolo (avviso se troppo lungo), durata; occhio per mostrare/nascondere una variante (A/B).
+  - Link del tuo canale → Fetch: nome e foto profilo appaiono sui tuoi video. Views e Uploaded modificabili.
+  - Dispositivi: Home, Search (con descrizione), Up next, Mobile (cornice telefono). Dark/Light, Mine (bordo sui tuoi), B/W, Squint (sfocato), Watched (barra rossa sugli altri). Shuffle / Reset posizioni.
+  - **Size view**: la tua thumbnail a 640, 360, 246, 168, 120 px. Avvisi se è sotto 1280×720 o non 16:9.
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.
@@ -111,6 +122,7 @@ Tieni **Eagle aperto** per i test con Eagle.
 - Upscale video: tutti i frame del video stanno su disco durante l'elaborazione (alcuni GB al minuto).
 - Gallery: file con lo stesso nome dentro la stessa galleria vengono selezionati/esclusi insieme.
 - Audible: togliere il DRM può violare i termini di Audible e la legge sul diritto d'autore (anche per uso personale). Usalo per i tuoi backup.
+- Thumbnail Tester: la data dei video degli altri è inventata (la ricerca non la fornisce); le foto profilo degli altri canali arrivano una alla volta.
 - Runtime AI: ~4.5 GB su disco in `hermes-data\python` + i modelli in `hermes-data\models`.
 
 ## Test automatici (li lancio io; da sistemare quando vuoi)

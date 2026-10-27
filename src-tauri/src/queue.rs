@@ -82,6 +82,8 @@ pub enum Step {
         background: String, // "" = transparent, else "#rrggbb"
         #[serde(default)]
         crop: bool,
+        #[serde(default)]
+        gentle: bool, // CPU on 2 threads: slower, PC stays smooth
     },
     /// Download one Audible book and convert it to M4B (src-tauri/src/audible.rs).
     Audible {
@@ -129,7 +131,9 @@ pub struct Job {
     #[serde(default)]
     note: String,
     /// Console output of the job's tools (what is downloading, warnings, server errors), like a terminal.
-    #[serde(default)]
+    /// Kept in memory only: never sent with queue snapshots or written to queue.json (it would make every
+    /// state change ship megabytes); the UI asks for it with `queue_log` when a console opens.
+    #[serde(default, skip_serializing)]
     log: Vec<String>,
 }
 
@@ -359,10 +363,10 @@ async fn run(id: String) {
             Step::Audible { asin, title, author, duration, folder } => {
                 crate::audible::download_book(&id, &asin, &title, &author, duration, &folder).await
             }
-            Step::Rembg { model, input, output, background, crop } => {
+            Step::Rembg { model, input, output, background, crop, gentle } => {
                 tick(&id, 0.0, "Removing background".into());
                 log_line(&id, &format!("> Removing background: model {model}, {input}"));
-                crate::rembg::remove(&model, &input, &output, &background, crop)
+                crate::rembg::remove(&model, &input, &output, &background, crop, gentle)
                     .await
                     .map(|device| {
                         if let Some(j) = job_mut(&mut lock(), &id) {
@@ -728,6 +732,12 @@ pub fn queue_clear_finished() {
         let parents: Vec<String> = q.jobs.iter().filter_map(|j| j.parent.clone()).collect();
         q.jobs.retain(|j| !j.group || parents.contains(&j.id));
     });
+}
+
+/// Console lines of one job (opened console in the UI).
+#[tauri::command]
+pub fn queue_log(id: String) -> Vec<String> {
+    lock().jobs.iter().find(|j| j.id == id).map(|j| j.log.clone()).unwrap_or_default()
 }
 
 /// The tool's "Clear" button: removes all of a module's jobs that aren't running right now.

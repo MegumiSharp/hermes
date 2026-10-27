@@ -159,12 +159,25 @@ export function fileTray(
   }));
   el.querySelector<HTMLButtonElement>("[data-clear-done]")!.onclick = () => { setItems(items().filter((i) => stateOf(i) !== "done")); render(); onChange(); };
   el.querySelector<HTMLButtonElement>("[data-clear-all]")!.onclick = () => { setItems([]); render(); onChange(); };
+  const redraw = () => { shape = ""; render(); };
 
   const label: Record<string, string> = {
     ready: "Ready", queued: "Queued", running: "Working", paused: "Paused", waitingEagle: "Waiting for Eagle", done: "Done", failed: "Failed",
   };
+  const progressOf = (j?: Job) => (j ? Math.round(((j.step + j.progress) / Math.max(j.steps.length, 1)) * 100) : 0);
+  let shape = ""; // items + states last drawn: progress ticks only touch bars/text, never rebuild cards
   function render() {
     const list = items();
+    const nextShape = list.map((i) => `${i.path}|${stateOf(i)}`).join("\n");
+    if (nextShape === shape) {
+      el.querySelectorAll<HTMLElement>(".tcard.running").forEach((card) => {
+        const j = jobOf(list.find((i) => i.path === card.dataset.path)!);
+        card.querySelector<HTMLElement>(".bar i")!.style.width = `${progressOf(j)}%`;
+        card.querySelector(".tstate")!.textContent = j?.detail || "Working";
+      });
+      return;
+    }
+    shape = nextShape;
     el.querySelector<HTMLElement>(".tray-bar")!.hidden = !list.length;
     const done = list.filter((i) => stateOf(i) === "done").length;
     const failed = list.filter((i) => stateOf(i) === "failed").length;
@@ -176,17 +189,17 @@ export function fileTray(
         <div class="tthumb">${IMAGE.test(it.path) ? `<img alt="" loading="lazy">` : icon(VIDEO.test(it.path) ? "film" : "music")}
           <span class="tbadge">${icon(st === "done" ? "check" : st === "failed" ? "alert" : st === "ready" ? "clock" : "download")}</span></div>
         <div class="tname"></div><div class="tstate"></div>
-        ${st === "running" ? `<div class="bar"><i style="width:${Math.round((j!.step + j!.progress) / Math.max(j!.steps.length, 1) * 100)}%"></i></div>` : ""}
+        ${st === "running" ? `<div class="bar"><i style="width:${progressOf(j)}%"></i></div>` : ""}
         <div class="tacts">
           ${st === "failed" ? `<button class="btn sm ghost" data-err title="Show and copy the error">${icon("copy")}</button><button class="btn sm ghost" data-retry title="Retry">${icon("retry")}</button>` : ""}
           <button class="btn sm ghost" data-rm title="Remove from list">${icon("x")}</button></div></div>`);
       card.title = it.path;
+      card.dataset.path = it.path;
       card.querySelector(".tname")!.textContent = fileName(it.path);
       card.querySelector(".tstate")!.textContent = st === "running" ? j!.detail || "Working" : st === "done" && j?.note ? `Done · ${j.note}` : label[st];
       const img = card.querySelector("img");
       if (img) {
-        img.src = convertFileSrc(it.path);
-        img.onerror = () => img.replaceWith(h(icon("image")));
+        thumbSrc(it.path).then((src) => (img.src = src), () => img.replaceWith(h(icon("image"))));
       }
       card.querySelector<HTMLButtonElement>("[data-rm]")!.onclick = () => { setItems(items().filter((x) => x !== it)); render(); onChange(); };
       card.querySelector<HTMLButtonElement>("[data-err]")?.addEventListener("click", () => showError(j!));
@@ -208,10 +221,22 @@ export function fileTray(
         it.job = ids[i];
       });
       setItems([...items()]);
-      render();
+      redraw();
     },
-    render,
+    render: redraw,
   };
+}
+
+const thumbs = new Map<string, Promise<string>>();
+/** asset URL of a small cached JPEG of an image (backend `thumbnail`), never the full-size file. */
+export function thumbSrc(path: string): Promise<string> {
+  let p = thumbs.get(path);
+  if (!p) {
+    p = invoke<string>("thumbnail", { path }).then(convertFileSrc);
+    p.catch(() => thumbs.delete(path));
+    thumbs.set(path, p);
+  }
+  return p;
 }
 
 // ---------- system stats ----------
@@ -244,7 +269,7 @@ export function statsBar(): HTMLElement {
       return c;
     }));
   };
-  const timer = setInterval(tick, 2000);
+  const timer = setInterval(tick, 3000); // nvidia-smi is a process spawn: keep it rare
   tick();
   return el;
 }
@@ -406,8 +431,7 @@ export function resultsPanel(module: string): HTMLElement {
       const t = h(`<button type="button" class="r-thumb" data-id="${j.id}"><img alt=""></button>`);
       t.title = fileName(j.source);
       const img = t.querySelector("img")!;
-      img.src = convertFileSrc(j.outputs.at(-1)!);
-      img.onerror = () => t.remove(); // result was moved or deleted
+      thumbSrc(j.outputs.at(-1)!).then((s) => (img.src = s), () => t.remove()); // gone: moved or deleted
       t.onclick = () => show(j);
       return t;
     }));

@@ -3,7 +3,7 @@
 // sidebar badge of "Downloads".
 import { h, navigate } from "./core";
 import { icon, IconName } from "./icons";
-import { queueCounts, watchJobs } from "./queue";
+import { Job, queueCounts, watchJobs } from "./queue";
 
 type Task = { id: string; label: string; module?: string; pct: number | null; detail: string };
 const tasks = new Map<string, Task>();
@@ -52,6 +52,40 @@ export function mountTasks(el: HTMLElement, meta: (module: string) => { name: st
 }
 
 /** Keeps the Downloads nav badge (running + queued + background tasks) current. */
+/**
+ * Status dot per tool in the sidebar: pulsing amber while it works (queue jobs or background
+ * tasks), red when something failed, green when work finished, until you open that tool.
+ * `dot(module)` returns the tool's dot element (or null for tools not in the sidebar).
+ */
+export function mountToolDots(dot: (module: string) => HTMLElement | null, current: () => string) {
+  const seen = new Set<string>(); // finished/failed job ids the user has already "seen" in their tool
+  let first = true;
+  let jobs: Job[] = [];
+  const render = () => {
+    const modules = new Set([...jobs.map((j) => j.module), ...[...tasks.values()].map((t) => t.module).filter(Boolean) as string[]]);
+    document.querySelectorAll<HTMLElement>(".nav-dot").forEach((d) => (d.className = "nav-dot"));
+    for (const m of modules) {
+      const el = dot(m);
+      if (!el) continue;
+      const mine = jobs.filter((j) => j.module === m && !j.group);
+      if (m === current()) mine.filter((j) => j.state === "done" || j.state === "failed").forEach((j) => seen.add(j.id));
+      const working = mine.some((j) => j.state === "running" || j.state === "queued") || [...tasks.values()].some((t) => t.module === m);
+      const failed = mine.some((j) => j.state === "failed" && !seen.has(j.id));
+      const done = mine.some((j) => j.state === "done" && !seen.has(j.id));
+      const state = working ? "working" : failed ? "failed" : done ? "done" : "";
+      el.className = `nav-dot ${state}`;
+      el.title = { working: "Working", failed: "Something failed: open the tool to see it", done: "Finished", "": "" }[state];
+    }
+  };
+  listeners.add(render);
+  watchJobs((all) => {
+    jobs = all;
+    if (first) { all.filter((j) => j.state === "done" || j.state === "failed").forEach((j) => seen.add(j.id)); first = false; } // old results aren't news
+    render();
+  }, () => true);
+  return render; // call when the open tool changes
+}
+
 export function mountBadge(badge: HTMLElement) {
   const render = () => {
     const { running, queued } = queueCounts();

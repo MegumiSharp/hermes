@@ -29,7 +29,7 @@ export function renderAudible(view: HTMLElement) {
 
   const page = h(`<div class="page audible">
     <div class="head"><div><h3>Audible</h3><div class="sub">Your purchased audiobooks as M4B files with chapters and cover</div></div>
-      <div class="right" id="a-actions"></div></div>
+      <div class="right"><span id="a-actions" style="display: contents"></span></div></div>
     <div id="a-body"></div>
   </div>`);
   const body = page.querySelector<HTMLElement>("#a-body")!;
