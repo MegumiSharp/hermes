@@ -23,7 +23,8 @@ Portable Windows utility app (no installer) for a content creator. Personal use,
 - t3-test "failure keeps the tool's error": ffmpeg's final line is "Error opening input files: No such file or directory" (file name is on an earlier line). Decide: better error capture or relax the test.
 - t4-test stops at the 2nd download: after "Add to queue" the preview is only hidden, its `.t` stays in the DOM, so `addAndWait` skips re-fetching and clicks a disabled button. Test bug; MP4/1080p/Eagle/playlist paths of T4 not yet covered by the automated run.
 - t5-7-test gallery section: Wikimedia rate-limits this IP after repeated runs (429 → queue cooldown, test times out). Run with `ONLY=rembg,upscale` or point the gallery test at another source.
-- v0.3.0 (T5-T7) not released yet: publishing needs the owner's go-ahead (`node scripts/release.mjs 0.3.0`).
+- T14 not released yet: publishing needs the owner's go-ahead (`node scripts/release.mjs 0.6.0`).
+- Spotify/Gallery call `memory()` inside render: an async probe finishing after the tool was reopened saves the old state object over newer settings (fixed in thumbs.ts by moving state to module scope).
 - Hermes.exe needs the VC++ 2015-2022 runtime (MSVCP140.dll, from ONNX Runtime). Present on almost every PC.
 
 ## Conventions
@@ -94,6 +95,7 @@ Config: `tauri.conf.json` (frameless 1180×760, `bundle.active=false`), `capabil
   `node scripts/t12-test.mjs` (info buttons, stats, Eagle chip, paste, failed-item flow, compare across tools, viewer + zoom, gallery title filter),
   `node scripts/t14-test.mjs` (dots, verify cache, queue_log, thumbnail cache, rembg gentle, AI models, Thumbnail Tester; `ONLY=dots,perf,rembg,models,thumbs`),
   `node scripts/t13-test.mjs` (Downloads page/badge, console, queue after tool switch, Clear, settings, converter, Image Upscale, video formats/Premiere/Mix, Spotify, gallery without previews; `ONLY=queue,converter,video,spotify,gallery`). **Run tests in the background; never block on them.**
+  Tests open Hermes on the second monitor when one is connected (`launch()` writes `settings.window` if the test set none).
   Harness `scripts/smoke.mjs` exports `{ launch, connect, check, OUT }`; tests call backend commands with
   `page.evaluate(() => window.__TAURI_INTERNALS__.invoke(cmd, args))`. Unauthenticated GitHub API = 60/h per IP:
   many fresh-data launches in an hour exhaust it.

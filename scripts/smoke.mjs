@@ -1,8 +1,8 @@
 // Drives the real Hermes.exe through WebView2's DevTools port.
 // Usage: node scripts/smoke.mjs [path\to\Hermes.exe]
 // Other test scripts import { launch } and reuse it.
-import { execSync, spawn } from "node:child_process";
-import { mkdirSync, readFileSync } from "node:fs";
+import { execFileSync, execSync, spawn } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright-core";
@@ -10,11 +10,31 @@ import { chromium } from "playwright-core";
 export const OUT = resolve("test-output");
 const DEFAULT_EXE = resolve("release/Hermes.exe");
 
+/** Tests run on the second monitor (owner's request) so the main screen stays free. Only when the
+ *  test hasn't set a window position itself; restarts keep the position the app saved. */
+let second;
+function onSecondScreen(dataDir) {
+  second ??= (() => {
+    try {
+      const ps = "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Screen]::AllScreens | Where-Object { -not $_.Primary } | Select-Object -First 1 | ForEach-Object { \"$($_.WorkingArea.X) $($_.WorkingArea.Y)\" }";
+      const out = execFileSync("powershell", ["-NoProfile", "-Command", ps]).toString().trim().split(/\s+/).map(Number);
+      return out.length === 2 && out.every(Number.isFinite) ? { x: out[0] + 80, y: out[1] + 60 } : null;
+    } catch { return null; }
+  })();
+  if (!second) return;
+  const file = join(dataDir, "settings.json");
+  const settings = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
+  if (settings.window) return;
+  mkdirSync(dataDir, { recursive: true });
+  writeFileSync(file, JSON.stringify({ ...settings, window: { ...second, width: 1180, height: 760, maximized: false } }));
+}
+
 /** Starts the exe with a DevTools port and returns { page, proc, errors, close }. */
 export async function launch(exe = DEFAULT_EXE, port = 9333) {
   // a Hermes left running by an aborted test would own WebView2's profile and DevTools port
   try { execSync("taskkill /IM Hermes.exe /F", { stdio: "ignore" }); } catch {}
   await new Promise((r) => setTimeout(r, 500));
+  onSecondScreen(join(dirname(exe), "hermes-data"));
   const proc = spawn(exe, [], {
     env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}` },
     stdio: "ignore",
