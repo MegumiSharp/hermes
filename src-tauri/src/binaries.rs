@@ -31,6 +31,9 @@ struct Tool {
     #[serde(default, rename = "verifyText")]
     verify_text: String,
     notify: bool,
+    /// Not bundled in the exe: installed on request (Binaries page or the tool asking), removable.
+    #[serde(default)]
+    optional: bool,
 }
 
 /// Windows' bsdtar (extracts zip). Git's GNU tar can come first on PATH and can't.
@@ -60,6 +63,7 @@ pub struct Status {
     ok: bool,
     error: Option<String>,
     notify: bool,
+    optional: bool,
 }
 
 pub fn bin_dir() -> PathBuf {
@@ -88,6 +92,70 @@ pub fn command(file: &str) -> tokio::process::Command {
     // below-normal priority: heavy jobs never make the PC sluggish, they just yield to what you're doing
     c.creation_flags(NO_WINDOW | BELOW_NORMAL_PRIORITY);
     c
+}
+
+/// Like `tool_text`, but every output line is also emitted live as `tool-line` `[id, line]`, so the
+/// UI can show what a slow probe is doing. Lines split on \n and \r (progress bars).
+#[tauri::command]
+pub async fn tool_stream(app: AppHandle, id: String, bin: String, args: Vec<String>) -> Result<String, String> {
+    use std::sync::Arc;
+    use tokio::io::{AsyncRead, AsyncReadExt};
+    async fn pump(mut r: impl AsyncRead + Unpin, app: AppHandle, id: String, text: Arc<Mutex<String>>) {
+        let (mut buf, mut pending) = ([0u8; 4096], Vec::new());
+        while let Ok(n) = r.read(&mut buf).await {
+            if n == 0 {
+                break;
+            }
+            pending.extend_from_slice(&buf[..n]);
+            while let Some(i) = pending.iter().position(|&b| b == b'\n' || b == b'\r') {
+                let line = String::from_utf8_lossy(&pending[..i]).trim().to_string();
+                pending.drain(..=i);
+                if !line.is_empty() {
+                    app.emit("tool-line", (&id, &line)).ok();
+                    let mut t = text.lock().unwrap();
+                    t.push_str(&line);
+                    t.push('\n');
+                }
+            }
+        }
+    }
+    let mut child = command(&bin)
+        .args(&args)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(err)?;
+    let text = Arc::new(Mutex::new(String::new()));
+    let a = tokio::spawn(pump(child.stdout.take().unwrap(), app.clone(), id.clone(), text.clone()));
+    let b = tokio::spawn(pump(child.stderr.take().unwrap(), app, id, text.clone()));
+    let status = child.wait().await.map_err(err)?;
+    a.await.ok();
+    b.await.ok();
+    let text = text.lock().unwrap().clone();
+    if status.success() {
+        Ok(text)
+    } else {
+        Err(text.lines().last().unwrap_or("The tool failed without a message").to_string())
+    }
+}
+
+/// Removes an optional tool (installed on request) from bin/.
+#[tauri::command]
+pub fn binary_remove(id: String) -> Result<(), String> {
+    let t = tool(&id)?;
+    if !t.optional {
+        return Err(format!("{} is part of Hermes", t.name));
+    }
+    for f in &t.files {
+        let p = bin_dir().join(f);
+        if p.exists() {
+            fs::remove_file(&p).map_err(err)?;
+        }
+    }
+    let mut all = installed();
+    all.remove(&t.id);
+    write_json(&versions_path(), &all)
 }
 
 /// Runs a bundled tool and returns its output; Err = the tool's error text (non-zero exit).
@@ -253,6 +321,7 @@ fn status(t: &Tool, check: Result<String, String>) -> Status {
         ok: check.is_ok(),
         error: check.err(),
         notify: t.notify,
+        optional: t.optional,
     }
 }
 

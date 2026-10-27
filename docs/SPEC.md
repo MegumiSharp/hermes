@@ -230,6 +230,17 @@ hermes-data/
 - Binaries → AI models: rembg model files vs the release's asset sizes, Whisper models vs the Hugging Face sha (Update re-downloads);
   Python packages vs PyPI, informational (pinned).
 
+## 16. Spotify sources and quality (T15)
+
+- spotDL matches songs on YouTube by title and length and can pick fan uploads (osu! beatmaps, covers, nightcore).
+  Hermes checks every pick (length ±4 s, no altered-version words missing from the Spotify title, uploaded by the artist,
+  "<artist> - Topic" or a YouTube Music artist field) and replaces rejected ones with the first trusted track of the YouTube
+  Music "Songs" search; none found = "No reliable source", skipped unless the user picks "Use anyway". Each row links its source.
+- Formats: Opus or M4A original (default Opus, the best audio YouTube has), MP3 320. Lossless FLAC via SpotiFLAC was evaluated
+  and dropped (Oct 2026: Qobuz/Deezer/Amazon servers down, Tidal crashes on Windows pipes); revisit if it is fixed upstream.
+- Reading a link shows live feedback (stage, n / total, elapsed, Details with the tool output). The download bar weights each
+  song by stage so parallel songs move it before any finishes.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.

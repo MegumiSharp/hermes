@@ -181,6 +181,8 @@ pub fn run() {
             binaries::binary_update,
             binaries::tool_json,
             binaries::tool_text,
+            binaries::tool_stream,
+            binaries::binary_remove,
             read_job_file,
             cookies::detect_browsers,
             cookies::cookies_write,

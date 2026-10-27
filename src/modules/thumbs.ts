@@ -62,7 +62,7 @@ export function renderThumbs(view: HTMLElement) {
         <div class="opts three">
           <div class="opt"><span class="field-label">Views</span><label class="field"><input id="t-views" placeholder="12K"></label></div>
           <div class="opt"><span class="field-label">Uploaded</span><label class="field"><input id="t-age" placeholder="1 day ago"></label></div>
-          <div class="opt"><span class="field-label">Description (search)</span><label class="field"><input id="t-desc" placeholder="First line of the description"></label></div>
+          <div class="opt"><span class="field-label">Description</span><label class="field" title="Shown under your title in search results"><input id="t-desc" placeholder="Shown in search results"></label></div>
         </div>
         <div><span class="field-label">Videos around yours</span>
           <form class="url" id="t-topic-form"><label class="field">${icon("search")}<input id="t-topic" placeholder="Your niche or a search, e.g. minecraft builds" spellcheck="false"></label>

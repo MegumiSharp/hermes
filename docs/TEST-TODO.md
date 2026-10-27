@@ -115,6 +115,16 @@ Tieni **Eagle aperto** per i test con Eagle.
   - Dispositivi: Home, Search (con descrizione), Up next, Mobile (cornice telefono). Dark/Light, Mine (bordo sui tuoi), B/W, Squint (sfocato), Watched (barra rossa sugli altri). Shuffle / Reset posizioni.
   - **Size view**: la tua thumbnail a 640, 360, 246, 168, 120 px. Avvisi se è sotto 1280×720 o non 16:9.
 
+## 13. Spotify (giro 4)
+- [ ] Incolla il link di **BIRDBRAIN** (o un'altra canzone che ti aveva dato una versione sbagliata): durante la lettura vedi cosa sta facendo, i secondi e **Details** con l'output.
+- [ ] Ogni brano ha un'etichetta: **Official**, **Fixed** (la scelta di spotDL era un video di fan/cover, sostituita con quella ufficiale) o **No reliable source** (saltato, a meno che premi *Use anyway*). Clic sull'etichetta = apre la fonte.
+- [ ] Una playlist: la barra deve avanzare in modo graduale, non solo alla fine.
+
+## 14. Grafica (giro 4)
+- [ ] Apri i menu a tendina di ogni tool: devono avere tutti lo stesso aspetto scuro con il segno di spunta arancione, nessuno quello di Windows.
+- [ ] Passa il mouse su un pulsante con suggerimento (per esempio Clear): il riquadro è scuro come il resto dell'app.
+- [ ] Le barre di scorrimento sono sottili e scure, senza freccette. Dimmi se vedi ancora qualcosa che sembra "di Windows" o spaziature strane.
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.

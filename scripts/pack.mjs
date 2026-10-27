@@ -6,7 +6,8 @@ import { execFileSync } from "node:child_process";
 import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { dirname, join, sep } from "node:path";
 
-const tools = JSON.parse(readFileSync("src-tauri/binaries.json", "utf8"));
+// optional tools are installed on request inside Hermes, not bundled
+const tools = JSON.parse(readFileSync("src-tauri/binaries.json", "utf8")).filter((t) => !t.optional);
 const headers = { "User-Agent": "Hermes-build" };
 if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
 

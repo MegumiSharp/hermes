@@ -486,6 +486,10 @@ fn clock(secs: f64) -> String {
 }
 
 /// Runs one tool step; Ok(output files it reported).
+/// spotDL --simple-tui prints "<song>: <stage>"; share of the song done at each stage.
+const SPOTDL_STAGES: [(&str, f64); 5] =
+    [("Searching for song", 0.1), ("Getting audio meta", 0.2), ("Downloading", 0.3), ("Embedding metadata", 0.9), ("Done", 1.0)];
+
 pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], parser: Parser, duration: f64) -> Result<Vec<String>, Stop> {
     let mut child = binaries::command(bin)
         .args(args)
@@ -507,6 +511,7 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
     let mut rate_limited = false;
     let mut last_tick = 0;
     let mut count = 0u32; // GalleryDl files seen
+    let mut stages: HashMap<String, f64> = HashMap::new(); // SpotDl: song -> share done
     tick(id, 0.0, label.into());
     log_line(id, &format!("> {label}: {bin} {}", args.join(" ")));
 
@@ -578,12 +583,23 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
                 })
             }
             Parser::Percent => percent(line).map(|p| (p / 100.0, format!("{label} {p:.0}%"))),
-            Parser::SpotDl => (line.starts_with("Downloaded ") || line.starts_with("Skipping ")).then(|| {
-                count += 1;
-                let total = duration.max(count as f64);
-                let song = line.split('"').nth(1).unwrap_or_default();
-                (count as f64 / total, format!("{label} {count} / {total:.0} · {song}"))
-            }),
+            Parser::SpotDl => {
+                // songs run in parallel and each takes ~20 s: their stages move the bar, not only finished songs
+                let finished = line.starts_with("Downloaded ") || line.starts_with("Skipping ");
+                let song = if finished { line.split('"').nth(1).unwrap_or_default() } else { line.rsplit_once(": ").map_or("", |(s, _)| s) };
+                let weight = if finished {
+                    Some(1.0)
+                } else {
+                    SPOTDL_STAGES.iter().find(|(stage, _)| line.ends_with(stage)).map(|&(_, w)| w)
+                };
+                weight.filter(|_| !song.is_empty()).map(|w| {
+                    let e = stages.entry(song.to_string()).or_insert(0.0);
+                    *e = f64::max(*e, w);
+                    let done = stages.values().filter(|&&v| v >= 1.0).count();
+                    let total = duration.max(stages.len() as f64);
+                    (stages.values().sum::<f64>() / total, format!("{label} {done} / {total:.0} · {song}"))
+                })
+            }
         };
         if let Some((pct, detail)) = update {
             if now_ms() - last_tick > 200 {

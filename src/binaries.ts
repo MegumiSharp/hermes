@@ -5,7 +5,7 @@ import { startTask } from "./activity";
 import { banner, h, navigate, saveSettings, settings } from "./core";
 import { icon } from "./icons";
 
-type Status = { id: string; name: string; version?: string; date?: string; ok: boolean; error?: string; notify: boolean };
+type Status = { id: string; name: string; version?: string; date?: string; ok: boolean; error?: string; notify: boolean; optional: boolean };
 type Ver = { version: string; date: string };
 
 let statuses: Status[] = [];
@@ -14,7 +14,8 @@ let checking = false;
 const updating = new Map<string, number>(); // id -> 0..1
 let rerender = () => {};
 
-const hasUpdate = (s: Status) => !!latest[s.id] && (!s.date || latest[s.id].date > s.date);
+const hasUpdate = (s: Status) => !!s.version && !!latest[s.id] && (!s.date || latest[s.id].date > s.date);
+const missingOptional = (s: Status) => s.optional && !s.version; // installed only when a tool asks for it
 const names = (list: Status[]) => list.map((s) => s.name).join(", ");
 
 listen<[string, number, number]>("binary-progress", ({ payload: [id, done, total] }) => {
@@ -22,6 +23,11 @@ listen<[string, number, number]>("binary-progress", ({ payload: [id, done, total
   const fill = document.querySelector<HTMLElement>(`[data-bin="${id}"] .bar i`);
   if (fill) fill.style.width = `${updating.get(id)! * 100}%`;
 });
+
+/** Installs or updates one tool in the background; true when it works afterwards. */
+export async function installTool(id: string): Promise<boolean> {
+  return update(id);
+}
 
 async function update(id: string): Promise<boolean> {
   updating.set(id, 0);
@@ -57,7 +63,7 @@ async function checkLatest(): Promise<string[]> {
 /** Resolves once every tool has been extracted/verified. Modules await this before running tools. */
 export const binariesReady: Promise<void> = (async () => {
   statuses = await invoke("binaries_init");
-  const broken = statuses.filter((s) => !s.ok);
+  const broken = statuses.filter((s) => !s.ok && !missingOptional(s));
   if (broken.length) {
     banner({
       id: "binaries-broken", tone: "warn", icon: "alert",
@@ -111,8 +117,15 @@ export function renderBinaries(view: HTMLElement) {
 
   const list = el.querySelector("#bin-list")!;
   list.addEventListener("click", (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-update]");
-    if (b) update(b.dataset.update!);
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-update], [data-remove]");
+    if (b?.dataset.update) update(b.dataset.update);
+    if (b?.dataset.remove) {
+      const s = statuses.find((x) => x.id === b.dataset.remove)!;
+      invoke("binary_remove", { id: s.id }).then(async () => {
+        statuses = await invoke("binaries_init");
+        rerender();
+      }, (e) => banner({ id: `bin-${s.id}`, tone: "warn", icon: "alert", text: `Removing ${s.name} failed: ${e}` }));
+    }
   });
 
   rerender = () => { // re-rendering a page that was navigated away from is harmless
@@ -127,12 +140,17 @@ export function renderBinaries(view: HTMLElement) {
         <div class="bin-act"></div></div>`);
       row.querySelector("b")!.textContent = s.name;
       row.querySelector(".bin-name .sub")!.textContent = s.version ?? "Not installed";
-      row.querySelector(".chip")!.append(s.ok ? "Working" : "Broken");
-      if (!s.ok) row.querySelector(".chip")!.setAttribute("title", s.error ?? "");
+      const chip = row.querySelector(".chip")!;
+      if (missingOptional(s)) { chip.classList.remove("bad"); chip.classList.add("off"); chip.append("Not installed"); }
+      else chip.append(s.ok ? "Working" : "Broken");
+      if (!s.ok && !missingOptional(s)) chip.setAttribute("title", s.error ?? "");
       row.querySelector(".bin-latest")!.textContent = checking ? "Checking" : l ? (hasUpdate(s) ? `Latest ${l.version}` : "Up to date") : "";
       const act = row.querySelector(".bin-act")!;
       if (busy) act.append(h(`<div class="bar"><i style="width:${(updating.get(s.id) ?? 0) * 100}%"></i></div>`));
-      else if (hasUpdate(s) || !s.ok) act.append(h(`<button class="btn sm primary" data-update="${s.id}">${icon("download")}${s.version ? "Update" : "Install"}</button>`));
+      else {
+        if (hasUpdate(s) || !s.ok) act.append(h(`<button class="btn sm primary" data-update="${s.id}">${icon("download")}${s.version ? "Update" : "Install"}</button>`));
+        if (s.optional && s.version) act.append(h(`<button class="btn sm ghost" data-remove="${s.id}" title="Delete it from this PC; install it again any time">${icon("trash")}Remove</button>`));
+      }
       return row;
     }));
   };

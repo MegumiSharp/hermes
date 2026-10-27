@@ -1,5 +1,6 @@
 import "@fontsource-variable/inter";
 import "./styles.css";
+import "./tooltip";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { availableMonitors, getCurrentWindow, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window";
@@ -44,10 +45,10 @@ const modules: Module[] = [
   {
     id: "spotify", name: "Spotify", icon: "music", section: "tools", render: renderSpotify,
     info: {
-      about: "Downloads Spotify songs, albums, playlists and artists: each track is matched on YouTube Music and saved with the Spotify title, artist, album, cover and lyrics.",
+      about: "Downloads Spotify songs, albums, playlists and artists with the Spotify title, artist, album, cover and lyrics. Every YouTube Music source is checked: fan uploads, covers and edits are replaced with the official track or skipped.",
       sources: ["open.spotify.com links: track, album, playlist, artist"],
-      formats: "MP3 320 kbps, or M4A / Opus without re-encoding. Audio quality is YouTube Music's (about 128-256 kbps).",
-      engine: "spotDL + FFmpeg", link: "https://github.com/spotDL/spotify-downloader",
+      formats: "Opus or M4A without re-encoding (YouTube Music's own audio, about 130-160 kbps), or MP3 320 kbps.",
+      engine: "spotDL + yt-dlp + FFmpeg", link: "https://github.com/spotDL/spotify-downloader",
     },
   },
   {

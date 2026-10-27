@@ -11,6 +11,12 @@
 }
 
 * { box-sizing: border-box; }
+/* scrollbars: thin, dark, no Windows arrow buttons (also inside dropdown pickers) */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: #34343a; border: 3px solid transparent; border-radius: 10px; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: #45454c; }
+::-webkit-scrollbar-button { display: none; }
 [hidden] { display: none !important; } /* component display rules (.btn, .check…) must not override hidden */
 html, body { height: 100%; margin: 0; }
 body { display: flex; flex-direction: column; background: var(--bg); color: var(--text); font: 13px/1.45 var(--font); overflow: hidden; user-select: none; }
@@ -106,6 +112,9 @@ button.select:hover, select.select:hover { border-color: #3a3a40; }
 .chip-btn:hover { color: var(--text); border-color: #3a3a40; }
 .chip-btn svg { width: 13px; height: 13px; }
 .chip.bad { color: var(--danger); }
+.chip.off .dot { background: var(--muted); }
+.chip.warn { color: var(--warn); }
+.chip.warn .dot { background: var(--warn); }
 .chip.bad .dot { background: var(--danger); }
 
 /* video module */
@@ -150,7 +159,6 @@ button.select:hover, select.select:hover { border-color: #3a3a40; }
 /* cookies modal */
 .cookies { display: flex; flex-direction: column; gap: 10px; color: var(--text); }
 .cookies .banner { align-items: flex-start; }
-.cookies select.select { appearance: auto; }
 .ck-title { font-weight: 600; margin-top: 6px; }
 .steps { margin: 0; padding-left: 20px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
 .steps b { color: var(--text); font-weight: 500; }
@@ -177,7 +185,6 @@ button.select:hover, select.select:hover { border-color: #3a3a40; }
 .chip.file button { display: flex; color: var(--muted); padding: 2px; border-radius: 50%; }
 .chip.file button:hover { color: var(--text); background: var(--track); }
 .chip.file svg { width: 12px; height: 12px; }
-select.select { appearance: auto; cursor: pointer; }
 .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); }
 .tab { padding: 8px 14px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .tab:hover { color: var(--text); }
@@ -525,3 +532,54 @@ input.num { width: 72px; height: 30px; padding: 0 8px; border: 1px solid var(--b
 .th-sizes-row { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; }
 .th-size .sub { margin-top: 6px; color: var(--yt-muted); font-family: var(--font); }
 .th-size .sub b { color: var(--yt-text); }
+
+/* live feedback (common.ts liveStatus) */
+.live { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); }
+.live-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.live-t { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-time { font-family: var(--mono); flex: none; }
+.live-more { margin-left: auto; flex: none; }
+.live-log { max-height: 180px; margin: 0; }
+.live.failed .live-t { color: var(--danger); white-space: normal; }
+.live.failed .bar i { background: var(--danger); }
+.s-src { display: flex; align-items: center; gap: 6px; flex: none; }
+.s-src .btn.sm { height: 24px; padding: 0 8px; }
+
+/* ---------- native controls drawn by Hermes (UI rule: nothing may look like Windows) ---------- */
+/* <select class="select">: customizable select (Chromium 135+), same look as the .menu dropdown */
+select.select, select.select::picker(select) { appearance: base-select; }
+select.select { cursor: pointer; justify-content: space-between; }
+select.select:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 1px; }
+select.select::picker-icon { content: ""; width: 16px; height: 16px; background: var(--muted); transition: rotate .15s;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") center / contain no-repeat; }
+select.select:open::picker-icon { rotate: 180deg; }
+select.select:open { border-color: #3a3a40; }
+select.select::picker(select) { margin-top: 4px; padding: 5px; min-width: anchor-size(width); max-height: min(360px, 60vh);
+  background: var(--menu); color: var(--text); border: 1px solid var(--border); border-radius: calc(var(--r) + 2px);
+  box-shadow: 0 18px 40px rgba(0,0,0,.5);
+  scrollbar-width: none; } /* the picker's scrollbar can't take ::-webkit-scrollbar styles; wheel and keys still scroll */
+select.select option { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r); font: 13px var(--font); cursor: pointer; }
+select.select option:hover, select.select option:focus-visible { background: var(--surface); outline: none; }
+select.select option:checked { color: var(--accent); }
+select.select option::checkmark { color: var(--accent); order: 1; margin-left: auto; }
+select.select option:disabled { color: var(--muted); opacity: .55; cursor: default; }
+select.select selectedcontent { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* number fields: no Windows spinners */
+input[type=number] { appearance: textfield; }
+input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { appearance: none; margin: 0; }
+input[type=number]:focus, input[type=date]:focus, input.num:focus, .g-filters input:focus { outline: none; border-color: var(--accent-line); }
+/* date fields: dark calendar, Hermes-colored icon */
+input[type=date] { color-scheme: dark; font-family: var(--mono); }
+input[type=date]::-webkit-datetime-edit { color: var(--text); }
+input[type=date]:invalid::-webkit-datetime-edit, input[type=date]:not(:valid)::-webkit-datetime-edit { color: var(--muted); }
+input[type=date]::-webkit-calendar-picker-indicator { filter: invert(.6); cursor: pointer; }
+/* color swatch */
+input[type=color] { cursor: pointer; }
+input[type=color]::-webkit-color-swatch-wrapper { padding: 2px; }
+input[type=color]::-webkit-color-swatch { border: 0; border-radius: 5px; }
+
+/* tooltips (tooltip.ts) */
+.tip { position: fixed; z-index: 1000; max-width: 320px; padding: 7px 10px; background: var(--menu); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--r); box-shadow: 0 10px 28px rgba(0,0,0,.45); font: 12px/1.45 var(--font);
+  pointer-events: none; white-space: pre-line; overflow-wrap: anywhere; }

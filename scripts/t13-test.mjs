@@ -50,7 +50,7 @@ rmSync(join(DATA, "queue.json"), { force: true });
 const C = join(W, "converter"), V = join(W, "video"), S = join(W, "spotify"), R = join(W, "rembg");
 writeFileSync(join(DATA, "settings.json"), JSON.stringify({
   lastModule: "converter", autoUpdateYtdlp: false, cookies: { youtube: "none" },
-  converter: { folder: C }, video: { folder: V, eagle: false, format: "best" }, spotify: { folder: S },
+  converter: { folder: C }, video: { folder: V, eagle: false, format: "best" }, spotify: { folder: S, format: "mp3" },
   rembg: { folder: R, eagle: true, model: "isnet-general-use" }, gallery: { folder: join(W, "gallery"), eagle: false, previews: false },
 }));
 const clip = join(W, "clip.mp4");
@@ -194,6 +194,7 @@ if (only("spotify")) {
   await page.click("#s-fetch");
   await until(async () => (await page.textContent("#s-list").catch(() => "")).includes("Never Gonna Give You Up"), "song list", 120000);
   check(true, "Spotify link read (song, artist, album)");
+  await until(() => page.$eval("#s-add", (b) => !b.disabled), "sources checked", 180000);
   await page.click("#s-add");
   const j = await nextJobDone(page, "spotify", 600000);
   const mp3 = readdirSync(S).find((f) => f.endsWith(".mp3"));
