@@ -2,7 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { startTask } from "./activity";
-import { banner, h, navigate, saveSettings, settings } from "./core";
+import { banner, h, modal, navigate, saveSettings, settings } from "./core";
 import { icon } from "./icons";
 import { liveStatus } from "./modules/common";
 
@@ -159,9 +159,29 @@ export function renderBinaries(view: HTMLElement) {
       return row;
     }));
   };
-  el.append(aiModelsCard());
+  el.append(officeCard(), aiModelsCard());
   view.append(el);
   rerender();
+}
+
+/** LibreOffice is not on GitHub (office.rs): its own row, installed by Document Converter or here. */
+function officeCard(): HTMLElement {
+  const card = h(`<div class="card" id="office-card"><div class="row"><div class="bin-name"><div class="v"><b>LibreOffice</b></div>
+    <div class="mono sub" id="office-ver"></div></div><div class="sub">Optional: faithful Word / PowerPoint / Excel to PDF and PDF to Word in Document Converter. 375 MB download, 1.5 GB on disk.</div>
+    <div class="right" id="office-act"></div></div></div>`);
+  const render = async () => {
+    const s = await invoke<{ installed: boolean; version: string }>("office_status");
+    card.querySelector("#office-ver")!.textContent = s.installed ? s.version || "installed" : "Not installed";
+    const act = card.querySelector<HTMLElement>("#office-act")!;
+    act.replaceChildren();
+    if (s.installed) {
+      const b = h(`<button class="btn sm ghost">${icon("trash")}Remove</button>`) as HTMLButtonElement;
+      b.onclick = async () => { b.disabled = true; await invoke("office_remove").catch((e) => banner({ id: "office", tone: "warn", icon: "alert", text: `Removing LibreOffice failed: ${e}` })); render(); };
+      act.append(b);
+    } else act.append(h(`<span class="sub">Installed when a conversion needs it</span>`));
+  };
+  render();
+  return card;
 }
 
 type ModelStatus = { kind: string; id: string; name: string; installed: string; latest: string; outdated: boolean; note: string };
@@ -190,6 +210,17 @@ function aiModelsCard(): HTMLElement {
       r.querySelector(".bin-name .sub")!.textContent = m.installed;
       r.querySelector(".chip span:last-child")!.textContent = m.outdated ? "Update available" : m.latest === "unknown" ? "Not checked" : "Up to date";
       r.querySelector(".bin-latest")!.textContent = m.note || (m.outdated ? `Latest ${m.latest}` : "");
+      if (m.kind !== "python") { // packages go with the runtime row
+        const d = h(`<button class="btn sm ghost" title="Delete it from this PC; the tool downloads it again when needed">${icon("trash")}Delete</button>`) as HTMLButtonElement;
+        d.onclick = () => modal({
+          title: `Delete ${m.name}?`, body: `Frees ${m.installed}. The tool that uses it will offer to download it again when needed.`,
+          actions: [{ label: "Cancel" }, { label: "Delete", primary: true, run: async () => {
+            try { await invoke("model_delete", { kind: m.kind, id: m.id }); } catch (e) { banner({ id: "ai-models", tone: "warn", icon: "alert", text: `Delete failed: ${e}` }); }
+            check();
+          } }],
+        });
+        r.querySelector(".bin-act")!.append(d);
+      }
       if (m.outdated && m.kind !== "python") {
         const u = h(`<button class="btn sm primary">${icon("download")}Update</button>`) as HTMLButtonElement;
         u.onclick = async () => {

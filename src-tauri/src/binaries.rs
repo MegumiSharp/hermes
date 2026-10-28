@@ -34,6 +34,18 @@ struct Tool {
     /// Not bundled in the exe: installed on request (Binaries page or the tool asking), removable.
     #[serde(default)]
     optional: bool,
+    /// Archive folder copied whole into bin/<id>/ (tools with many DLLs, e.g. Poppler's "Library/bin");
+    /// `files` are then relative to it.
+    #[serde(default)]
+    folder: String,
+}
+
+/// Where a tool's file lives: bin/<file>, or bin/<id>/<file> for folder tools.
+fn tool_path(t: &Tool, file: &str) -> PathBuf {
+    if t.folder.is_empty() { bin_dir().join(file) } else { bin_dir().join(&t.id).join(file) }
+}
+fn present(t: &Tool) -> bool {
+    t.files.iter().all(|f| tool_path(t, f).exists())
 }
 
 /// Windows' bsdtar (extracts zip). Git's GNU tar can come first on PATH and can't.
@@ -76,10 +88,19 @@ pub fn bin_dir() -> PathBuf {
 /// on PATH so tools find each other (yt-dlp and gallery-dl call ffmpeg).
 pub fn command(file: &str) -> tokio::process::Command {
     // "python.exe" is the portable AI runtime (python.rs), not a bundled tool
-    let exe = if file == "python.exe" { crate::python::exe() } else { bin_dir().join(file) };
+    // folder tools (Poppler) keep their exe and DLLs in bin/<id>/
+    let folders: Vec<PathBuf> = TOOLS.iter().filter(|t| !t.folder.is_empty()).map(|t| bin_dir().join(&t.id)).collect();
+    let exe = if file == "python.exe" {
+        crate::python::exe()
+    } else if file == "soffice.exe" {
+        crate::office::exe() // LibreOffice, an optional component (office.rs)
+    } else {
+        folders.iter().map(|d| d.join(file)).find(|p| p.exists()).unwrap_or_else(|| bin_dir().join(file))
+    };
     let mut c = tokio::process::Command::new(exe);
     let path = std::env::var_os("PATH").unwrap_or_default();
     let mut dirs = vec![bin_dir()];
+    dirs.extend(folders);
     dirs.extend(std::env::split_paths(&path));
     c.env("PATH", std::env::join_paths(dirs).unwrap_or(path));
     c.env("PYTHONIOENCODING", "utf-8"); // non-ASCII titles/paths in tool output
@@ -89,6 +110,7 @@ pub fn command(file: &str) -> tokio::process::Command {
     c.env("TORCH_HOME", data_dir().join("models").join("torch"));
     c.env("HF_HOME", data_dir().join("models").join("hf"));
     c.env("HF_HUB_DISABLE_SYMLINKS_WARNING", "1");
+    c.env("TECTONIC_CACHE_DIR", data_dir().join("cache").join("tectonic")); // TeX packages it downloads on first use
     // below-normal priority: heavy jobs never make the PC sluggish, they just yield to what you're doing
     c.creation_flags(NO_WINDOW | BELOW_NORMAL_PRIORITY);
     c
@@ -148,11 +170,15 @@ pub fn binary_remove(id: String) -> Result<(), String> {
     if !t.optional {
         return Err(format!("{} is part of Hermes", t.name));
     }
-    for f in &t.files {
-        let p = bin_dir().join(f);
-        if p.exists() {
-            fs::remove_file(&p).map_err(err)?;
+    if t.folder.is_empty() {
+        for f in &t.files {
+            let p = bin_dir().join(f);
+            if p.exists() {
+                fs::remove_file(&p).map_err(err)?;
+            }
         }
+    } else {
+        fs::remove_dir_all(bin_dir().join(&t.id)).or_else(|e| if e.kind() == io::ErrorKind::NotFound { Ok(()) } else { Err(err(e)) })?;
     }
     let mut all = installed();
     all.remove(&t.id);
@@ -295,7 +321,7 @@ fn extract(t: &Tool, p: &Payload) -> Result<(), String> {
 
 /// Size + modified time of a tool's main file: if unchanged since it last verified, skip running it.
 fn fingerprint(t: &Tool) -> Option<String> {
-    let m = fs::metadata(bin_dir().join(&t.files[0])).ok()?;
+    let m = fs::metadata(tool_path(t, &t.files[0])).ok()?;
     let mtime = m.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?.as_secs();
     Some(format!("{}:{mtime}", m.len()))
 }
@@ -306,8 +332,7 @@ fn verify_cached(t: &Tool) -> Result<String, String> {
     let cache_path = bin_dir().join("verified.json");
     let mut cache: HashMap<String, String> = read_json(&cache_path).unwrap_or_default();
     let fp = fingerprint(t);
-    let present = t.files.iter().all(|f| bin_dir().join(f).exists());
-    if present && fp.is_some() && cache.get(&t.id) == fp.as_ref() {
+    if present(t) && fp.is_some() && cache.get(&t.id) == fp.as_ref() {
         return Ok(String::new());
     }
     let r = verify(t);
@@ -321,8 +346,8 @@ fn verify_cached(t: &Tool) -> Result<String, String> {
 
 /// Runs the tool's version command; Ok(first output line).
 fn verify(t: &Tool) -> Result<String, String> {
-    let exe = bin_dir().join(&t.files[0]);
-    if !t.files.iter().all(|f| bin_dir().join(f).exists()) {
+    let exe = tool_path(t, &t.files[0]);
+    if !present(t) {
         return Err("Not installed".into());
     }
     if t.verify.is_empty() {
@@ -375,7 +400,7 @@ pub async fn binaries_init() -> Vec<Status> {
                         (None, Some(_)) => true,
                         _ => false,
                     };
-                    let missing = !t.files.iter().all(|f| bin_dir().join(f).exists());
+                    let missing = !present(t);
                     if missing || stale {
                         extract(t, p).ok();
                     }
@@ -439,7 +464,8 @@ async fn latest(t: &Tool) -> Result<(Ver, String, String), String> {
     let version = if rel.tag == "latest" {
         format!("{cap} · {}", rel.date.get(..10).unwrap_or_default())
     } else {
-        rel.tag.trim_start_matches('v').to_string()
+        // "v1.2", "tectonic@0.17.0" → "1.2", "0.17.0"
+        rel.tag.rsplit('@').next().unwrap_or(&rel.tag).trim_start_matches('v').to_string()
     };
     Ok((Ver { version, date: rel.date }, name, url))
 }
@@ -478,6 +504,9 @@ pub async fn binary_update(app: AppHandle, id: String) -> Result<Status, String>
     .await?;
 
     let result = (|| {
+        if !t.folder.is_empty() {
+            return install_folder(t, &file, &tmp).and_then(|_| set_installed(&t.id, ver.clone()));
+        }
         let sources: Vec<PathBuf> = if asset.ends_with(".zip") {
             let ok = tar().arg("-xf").arg(&file).arg("-C").arg(&tmp).status().map_err(err)?.success();
             if !ok {
@@ -499,6 +528,46 @@ pub async fn binary_update(app: AppHandle, id: String) -> Result<Status, String>
     fs::remove_dir_all(&tmp).ok();
     result?;
     Ok(status(t, verify(t)))
+}
+
+/// Folder tools: extract, then swap the archive's `folder` in as bin/<id>/ (the old copy kept until it works).
+fn install_folder(t: &Tool, archive: &Path, tmp: &Path) -> Result<(), String> {
+    if !tar().arg("-xf").arg(archive).arg("-C").arg(tmp).status().map_err(err)?.success() {
+        return Err("Could not extract the archive".into());
+    }
+    let src = find_dir(tmp, &t.folder).ok_or(format!("{} not in archive", t.folder))?;
+    if !t.files.iter().all(|f| src.join(f).exists()) {
+        return Err(format!("{} not in archive", t.files.join(", ")));
+    }
+    let dest = bin_dir().join(&t.id);
+    let old = bin_dir().join(format!("{}.old-dir", t.id));
+    fs::remove_dir_all(&old).ok();
+    if dest.exists() {
+        fs::rename(&dest, &old).map_err(err)?;
+    }
+    if let Err(e) = fs::rename(&src, &dest) {
+        fs::rename(&old, &dest).ok();
+        return Err(err(e));
+    }
+    fs::remove_dir_all(&old).ok();
+    Ok(())
+}
+
+/// First directory under `dir` whose path ends with `rel` ("Library/bin").
+fn find_dir(dir: &Path, rel: &str) -> Option<PathBuf> {
+    let rel = Path::new(rel);
+    for e in fs::read_dir(dir).ok()?.flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            if p.ends_with(rel) {
+                return Some(p);
+            }
+            if let Some(f) = find_dir(&p, rel.to_str()?) {
+                return Some(f);
+            }
+        }
+    }
+    None
 }
 
 /// Finds `rel` ("ffmpeg.exe" or "models/x.bin") anywhere under `dir` (archives nest a top folder).
@@ -529,5 +598,11 @@ mod tests {
         assert_eq!(glob(pat, "ffmpeg-n9.0-latest-win64-gpl-shared-9.0.zip").as_deref(), None);
         assert_eq!(glob(pat, "ffmpeg-master-latest-win64-gpl.zip"), None);
         assert!(natural("10.0") > natural("9.1"));
+        // document components (T20b)
+        assert_eq!(glob("pandoc-*-windows-x86_64.zip", "pandoc-3.13-windows-x86_64.zip").as_deref(), Some("3.13"));
+        let tec = "tectonic-*-x86_64-pc-windows-msvc.zip";
+        assert_eq!(glob(tec, "tectonic-0.17.0-x86_64-pc-windows-msvc.zip").as_deref(), Some("0.17.0"));
+        assert_eq!(glob(tec, "tectonic-0.17.0-x86_64-pc-windows-gnu.zip"), None);
+        assert_eq!(glob("Release-*-0.zip", "Release-26.09.0-0.zip").as_deref(), Some("26.09.0"));
     }
 }

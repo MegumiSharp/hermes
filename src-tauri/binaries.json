@@ -53,6 +53,38 @@
     "notify": true
   },
   {
+    "id": "pandoc",
+    "name": "Pandoc",
+    "api": "https://api.github.com/repos/jgm/pandoc/releases/latest",
+    "asset": "pandoc-*-windows-x86_64.zip",
+    "files": ["pandoc.exe"],
+    "verify": ["--version"],
+    "notify": false,
+    "optional": true
+  },
+  {
+    "id": "tectonic",
+    "name": "Tectonic (LaTeX)",
+    "api": "https://api.github.com/repos/tectonic-typesetting/tectonic/releases/latest",
+    "asset": "tectonic-*-x86_64-pc-windows-msvc.zip",
+    "files": ["tectonic.exe"],
+    "verify": ["--version"],
+    "notify": false,
+    "optional": true
+  },
+  {
+    "id": "poppler",
+    "name": "Poppler (PDF)",
+    "api": "https://api.github.com/repos/oschwartz10612/poppler-windows/releases/latest",
+    "asset": "Release-*-0.zip",
+    "folder": "Library/bin",
+    "files": ["pdftoppm.exe", "pdftotext.exe"],
+    "verify": ["-v"],
+    "verifyText": "pdftoppm",
+    "notify": false,
+    "optional": true
+  },
+  {
     "id": "audible",
     "name": "audible-cli",
     "api": "https://api.github.com/repos/mkb79/audible-cli/releases/latest",

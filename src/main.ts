@@ -19,6 +19,7 @@ import { renderUpscale } from "./modules/upscale";
 import { renderSpotify } from "./modules/spotify";
 import { renderConverter } from "./modules/converter";
 import { renderImgConv } from "./modules/imgconv";
+import { renderDocConv } from "./modules/docconv";
 import { renderAudible } from "./modules/audible";
 import { renderDemucs } from "./modules/demucs";
 import { renderWhisper } from "./modules/whisper";
@@ -89,6 +90,14 @@ const modules: Module[] = [
       about: "Changes an image's format or size (never enlarges), or traces it into an SVG vector for logos, icons and drawings. Transparency is kept where the format supports it, otherwise it becomes white.",
       formats: "PNG, JPG, WebP, AVIF, HEIC, BMP, TIFF, GIF, ICO in; PNG, JPG, WebP, AVIF, TIFF, BMP, GIF, ICO (256 × 256) or SVG out.",
       engine: "FFmpeg + vtracer (vector tracing, built in)",
+    },
+  },
+  {
+    id: "docconv", name: "Document Converter", icon: "fileText", section: "tools", render: renderDocConv,
+    info: {
+      about: "Converts documents in every useful direction: Word, OpenDocument and RTF to PDF with the layout kept, PDF to editable Word, to page images or text, Markdown, LaTeX, web pages and e-books between each other, slides and spreadsheets to PDF.",
+      formats: "DOCX, ODT, RTF, DOC, PPTX, XLSX, PDF, Markdown, LaTeX, HTML, EPUB, TXT in; PDF, DOCX, ODT, RTF, Markdown, HTML, EPUB, LaTeX, TXT, PNG/JPG pages out.",
+      engine: "Pandoc, Tectonic (LaTeX), Poppler, LibreOffice: each downloaded only when a conversion needs it",
     },
   },
   {

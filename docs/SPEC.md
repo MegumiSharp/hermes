@@ -263,6 +263,15 @@ hermes-data/
 - Size: keep or cap the long side (3840 … 256), never enlarging. Formats without alpha get a white background.
   Same format as the source saves as "<name> (converted)". Optional copy to Eagle. Nothing to download.
 
+## 20. Document Converter (T20b)
+
+- Text formats (Markdown, HTML, LaTeX, EPUB, TXT) between each other and to DOCX/ODT/RTF with Pandoc; to PDF with Pandoc +
+  Tectonic (LaTeX directly with Tectonic). DOCX/ODT/RTF/DOC/PPTX/XLSX to PDF, DOC/DOCX/ODT/RTF between each other and PDF to
+  DOCX/ODT with LibreOffice; DOCX/ODT/RTF to text formats with Pandoc. PDF to page images (PNG/JPG, 150 dpi) and text with Poppler.
+- Every engine is an optional component: the first conversion that needs it lists what will be downloaded with sizes and
+  asks; LibreOffice (375 MB, 1.5 GB on disk) is unpacked from the official MSI without admin rights.
+- Binaries lists every optional component and downloaded model with Remove/Delete (rembg, Whisper, Demucs, the AI runtime).
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.

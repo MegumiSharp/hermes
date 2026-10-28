@@ -17,6 +17,7 @@ export const fileName = (p: string) => (p.split(/[\\/]/).pop() ?? p).replace(/^\
 export const stem = (p: string) => fileName(p).replace(/\.[^.]+$/, "");
 const IMAGE = /\.(png|jpe?g|webp|bmp|gif|tiff?)$/i;
 const VIDEO = /\.(mp4|mkv|mov|webm|avi|m4v)$/i;
+const AUDIO = /\.(mp3|wav|flac|m4a|aac|ogg|opus|wma|m4b)$/i; // anything else (documents) gets a file icon
 
 /** "Save to" field; fills `prefs.folder` with Downloads\Hermes on first use. */
 export function folderField(prefs: { folder: string }, save: () => void, id: string): HTMLElement {
@@ -188,7 +189,7 @@ export function fileTray(
       const j = jobOf(it);
       const st = stateOf(it);
       const card = h(`<div class="tcard ${st}" title="">
-        <div class="tthumb">${IMAGE.test(it.path) ? `<img alt="" loading="lazy">` : icon(VIDEO.test(it.path) ? "film" : "music")}
+        <div class="tthumb">${IMAGE.test(it.path) ? `<img alt="" loading="lazy">` : icon(VIDEO.test(it.path) ? "film" : AUDIO.test(it.path) ? "music" : "fileText")}
           <span class="tbadge">${icon(st === "done" ? "check" : st === "failed" ? "alert" : st === "ready" ? "clock" : "download")}</span></div>
         <div class="tname"></div><div class="tstate"></div>
         ${st === "running" ? `<div class="bar"><i style="width:${progressOf(j)}%"></i></div>` : ""}

@@ -150,6 +150,12 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] Un PNG con trasparenza in JPG: lo sfondo diventa bianco.
 - [ ] **SVG** su un logo: prova Full colour / Black and white e i tre livelli di dettaglio; apri l'SVG in Illustrator o nel browser.
 
+## 20. Document Converter (giro 4)
+- [ ] Trascina un Word e scegli **PDF**: la prima volta chiede di scaricare LibreOffice (375 MB); dopo, il PDF ha lo stesso impaginato del Word.
+- [ ] Un PDF in **Word (DOCX)** (modificabile), in **Images, one per page** e in **Plain text**.
+- [ ] Un file Markdown in Word, HTML, EPUB e PDF; un .tex in PDF (la prima volta LaTeX scarica i suoi pacchetti: qualche minuto).
+- [ ] Binaries: LibreOffice, Pandoc, Tectonic, Poppler si possono rimuovere; **Check models** mostra **Delete** su ogni modello e sul runtime AI.
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.
@@ -158,6 +164,7 @@ Tieni **Eagle aperto** per i test con Eagle.
 - Gallery: file con lo stesso nome dentro la stessa galleria vengono selezionati/esclusi insieme.
 - Audible: togliere il DRM può violare i termini di Audible e la legge sul diritto d'autore (anche per uso personale). Usalo per i tuoi backup.
 - Thumbnail Tester: la data dei video degli altri è inventata (la ricerca non la fornisce); le foto profilo degli altri canali arrivano una alla volta.
+- Document Converter: PDF → Word è approssimativo sui PDF complessi (colonne, tabelle); LibreOffice occupa 1,5 GB.
 - Runtime AI: ~4.5 GB su disco in `hermes-data\python` + i modelli in `hermes-data\models`.
 
 ## Test automatici (li lancio io; da sistemare quando vuoi)

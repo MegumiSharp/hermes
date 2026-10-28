@@ -605,3 +605,9 @@ input[type=color]::-webkit-color-swatch { border: 0; border-radius: 5px; }
 .yt-score.hot { background: var(--accent); color: var(--accent-fg); }
 .yt-card.dim { opacity: .4; }
 .card .row > .right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: none; } /* action buttons at the end of a card row */
+
+/* Document Converter */
+.dc-uses { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.dc-uses:empty { display: none; }
+.dc-bad { flex-basis: 100%; color: var(--warn); }
+.m-text ul { margin: 8px 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }

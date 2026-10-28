@@ -13,7 +13,7 @@ use tauri::AppHandle;
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelStatus {
-    kind: &'static str, // "rembg" | "whisper" | "python"
+    kind: &'static str, // "rembg" | "whisper" | "demucs" | "runtime" | "python"
     id: String,
     name: String,
     installed: String,
@@ -24,6 +24,22 @@ pub struct ModelStatus {
 
 async fn json(url: &str) -> Result<Value, String> {
     client().get(url).send().await.map_err(err)?.error_for_status().map_err(err)?.json().await.map_err(err)
+}
+
+fn demucs_dir() -> PathBuf {
+    data_dir().join("models").join("torch").join("hub").join("checkpoints")
+}
+
+/// Total size of a folder, for "how much space does deleting this free".
+fn size_of(p: &std::path::Path) -> u64 {
+    match fs::metadata(p) {
+        Ok(m) if m.is_dir() => fs::read_dir(p).into_iter().flatten().flatten().map(|e| size_of(&e.path())).sum(),
+        Ok(m) => m.len(),
+        Err(_) => 0,
+    }
+}
+fn human(bytes: u64) -> String {
+    if bytes >= 1 << 30 { format!("{:.1} GB", bytes as f64 / (1u64 << 30) as f64) } else { format!("{} MB", bytes / (1 << 20)) }
 }
 
 fn whisper_dir() -> PathBuf {
@@ -75,8 +91,21 @@ pub async fn models_status() -> Vec<ModelStatus> {
         });
     }
 
+    // Demucs checkpoints (PyTorch hub cache): fixed releases, listed so they can be deleted
+    for e in fs::read_dir(demucs_dir()).into_iter().flatten().flatten() {
+        let file = e.file_name().to_string_lossy().to_string();
+        out.push(ModelStatus {
+            kind: "demucs", id: file.clone(), name: format!("{file} (Stem Separation)"), installed: human(size_of(&e.path())),
+            latest: "unknown".into(), outdated: false, note: "Fixed release".into(),
+        });
+    }
+
     // Python packages of the AI runtime
     if python::exe().exists() {
+        out.push(ModelStatus {
+            kind: "runtime", id: "python".into(), name: "AI runtime (Python + PyTorch)".into(), installed: human(size_of(&python::dir())),
+            latest: "unknown".into(), outdated: false, note: "Used by Stem Separation and Subtitles".into(),
+        });
         let list = crate::binaries::command("python.exe")
             .args(["-m", "pip", "list", "--format", "json", "--disable-pip-version-check"])
             .stdin(Stdio::null())
@@ -97,6 +126,21 @@ pub async fn models_status() -> Vec<ModelStatus> {
         }
     }
     out
+}
+
+/// Deletes a downloaded model (or the whole AI runtime); tools download it again when needed.
+#[tauri::command]
+pub fn model_delete(kind: String, id: String) -> Result<(), String> {
+    if id.contains(['/', '\\']) || id.contains("..") {
+        return Err("invalid id".into());
+    }
+    match kind.as_str() {
+        "rembg" => rembg::rembg_delete(id),
+        "whisper" => fs::remove_dir_all(whisper_dir().join(&id)).map_err(err),
+        "demucs" => fs::remove_file(demucs_dir().join(&id)).map_err(err),
+        "runtime" => python::python_remove(),
+        _ => Err("This component is part of the AI runtime".into()),
+    }
 }
 
 /// Re-downloads one model (rembg: replace the file; Whisper: refresh the Hugging Face snapshot).

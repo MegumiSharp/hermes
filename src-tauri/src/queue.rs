@@ -357,7 +357,8 @@ async fn run(id: String) {
                 replace_outputs = replace;
                 // one GPU upscale at a time (rembg serialises on its own session lock)
                 static GPU: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-                let _gpu = if bin.starts_with("realesrgan") { Some(GPU.lock().await) } else { None };
+                // LibreOffice instances sharing one profile hand work to each other: one at a time too
+                let _gpu = if bin.starts_with("realesrgan") || bin == "soffice.exe" { Some(GPU.lock().await) } else { None };
                 let last = job.outputs.last().cloned().unwrap_or_default();
                 let fill = |s: &String| fill_placeholders(s, &last);
                 let args: Vec<String> = args.iter().map(fill).collect();

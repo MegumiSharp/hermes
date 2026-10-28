@@ -5,6 +5,7 @@ mod eagle;
 mod lyrics;
 mod models;
 mod net;
+mod office;
 mod python;
 mod queue;
 mod rembg;
@@ -225,11 +226,15 @@ pub fn run() {
             rembg::rembg_compare,
             rembg::thumbnail,
             models::models_status,
+            office::office_status,
+            office::office_install,
+            office::office_remove,
             usage::usage_log,
             usage::usage_read,
             usage::usage_clear,
             usage::usage_export,
             models::model_update,
+            models::model_delete,
             module_paths,
             write_job_file,
             save_upload,
