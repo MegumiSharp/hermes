@@ -38,7 +38,8 @@ svg.i { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-widt
 
 /* ---------- layout ---------- */
 .body { flex: 1; display: flex; min-height: 0; }
-.side { width: 208px; flex: none; display: flex; flex-direction: column; gap: 2px; padding: 14px 10px; background: var(--chrome); border-right: 1px solid var(--border); }
+.side { width: 208px; flex: none; display: flex; flex-direction: column; background: var(--chrome); border-right: 1px solid var(--border); min-height: 0; }
+.side-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 14px 10px; }
 .side .label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 6px 10px 8px; }
 .side .spacer { flex: 1; }
 .nav { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r); color: var(--muted); text-align: left; }
@@ -668,3 +669,59 @@ input[type=range].range { width: 100%; accent-color: var(--accent); cursor: poin
 .bd-styles button { justify-content: center; border-left: 1px solid var(--border); border-top: 1px solid var(--border); margin: -1px 0 0 -1px; }
 .bd-seg { display: flex; width: 100%; } .bd-seg button { flex: 1; justify-content: center; }
 .bd-panel.empty .pt-sliders, .bd-panel.empty .bd-seg, .bd-panel.empty .bd-styles, .bd-panel.empty .check { opacity: .45; }
+
+/* T24 Anya, the companion (anya.ts). --anya-scale = Size setting */
+:root { --anya-scale: 1; }
+.anya-corner { flex: none; height: 0; }
+body[data-anya="sidebar"] .anya-corner { height: calc(146px * var(--anya-scale)); background: linear-gradient(transparent, rgba(242,163,58,.035)); }
+.anya { position: fixed; z-index: 40; pointer-events: none; width: calc(130px * var(--anya-scale)); height: calc(146px * var(--anya-scale)); }
+.anya[hidden] { display: none; }
+body[data-anya="sidebar"] .anya { left: calc(104px - 60px * var(--anya-scale)); bottom: 0; }
+body[data-anya="corner"] .anya { right: 14px; bottom: 6px; }
+/* corner mode: room at the end of every page, so whatever is under her can be scrolled above her */
+body[data-anya="corner"] #view { padding-bottom: calc(150px * var(--anya-scale)); }
+.anya .stage { position: absolute; inset: 0 0 6px 0; pointer-events: auto; cursor: pointer; }
+.anya .shadow { position: absolute; left: 18%; right: 18%; bottom: 0; height: 10px; border-radius: 50%; background: radial-gradient(rgba(0,0,0,.55), transparent 70%); }
+.anya .wobble, .anya .squish { position: absolute; inset: 0; transform-origin: 50% 100%; }
+.anya[data-wobble="gentle"] .wobble { --r: 1.6deg; --y: -3px; animation: anya-wobble 3.6s ease-in-out infinite; }
+.anya[data-wobble="lively"] .wobble { --r: 3.6deg; --y: -6px; animation: anya-wobble 2.4s ease-in-out infinite; }
+.anya[data-wobble="gentle"] .shadow, .anya[data-wobble="lively"] .shadow { animation: anya-shadow 3.6s ease-in-out infinite; }
+.anya.talking .squish { animation: anya-squish .32s ease-in-out infinite; }
+.anya.pop .squish { animation: anya-pop .42s cubic-bezier(.3,1.6,.5,1); }
+.anya.poke .squish { animation: anya-poke .45s ease-out; }
+.anya img.pose { position: absolute; left: 0; right: 0; bottom: 0; margin: auto; max-width: 100%; max-height: 100%; display: block; user-select: none; filter: drop-shadow(0 2px 6px rgba(0,0,0,.35)); }
+.anya .stage:hover img.pose { filter: drop-shadow(0 2px 6px rgba(0,0,0,.35)) drop-shadow(0 0 10px rgba(242,163,58,.25)); }
+@keyframes anya-wobble { 0%, 100% { transform: rotate(calc(var(--r) * -1)) translateY(0); } 50% { transform: rotate(var(--r)) translateY(var(--y)); } }
+@keyframes anya-shadow { 0%, 100% { transform: scaleX(1); opacity: .9; } 50% { transform: scaleX(.88); opacity: .7; } }
+@keyframes anya-squish { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.06, .93); } }
+@keyframes anya-pop { 0% { transform: scale(.82, 1.1); opacity: .2; } 100% { transform: scale(1, 1); opacity: 1; } }
+@keyframes anya-poke { 0% { transform: scale(1.12, .86); } 45% { transform: scale(.94, 1.08); } 100% { transform: scale(1, 1); } }
+.anya .busy { position: absolute; left: 70%; bottom: 82%; padding: 2px 8px; border-radius: 999px; background: var(--menu); border: 1px solid var(--border); color: var(--muted); font: 11px var(--mono); white-space: nowrap; opacity: 0; transform: translateY(4px); transition: .25s; }
+body[data-anya="corner"] .anya .busy { left: auto; right: 70%; }
+.anya.idle .busy { opacity: 1; transform: none; }
+.anya .busy b { color: var(--accent); font-weight: 400; animation: anya-dots 1.2s steps(4) infinite; display: inline-block; width: 2.2ch; overflow: hidden; vertical-align: bottom; }
+@keyframes anya-dots { from { width: 0; } to { width: 2.2ch; } }
+.anya-bubble { position: fixed; z-index: 41; width: max-content; max-width: 300px; background: var(--menu); border: 1px solid var(--border); border-radius: 12px 12px 12px 4px; padding: 10px 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45); opacity: 0; transform: translateY(6px) scale(.98); transform-origin: 0 100%; transition: opacity .18s, transform .18s; pointer-events: none; cursor: pointer; }
+body[data-anya="sidebar"] .anya-bubble { left: calc(104px + 64px * var(--anya-scale)); bottom: calc(92px * var(--anya-scale)); }
+body[data-anya="corner"] .anya-bubble { right: calc(20px + 120px * var(--anya-scale)); bottom: calc(92px * var(--anya-scale)); border-radius: 12px 12px 4px 12px; transform-origin: 100% 100%; }
+.anya-bubble.show { opacity: 1; transform: none; pointer-events: auto; }
+.anya-bubble::before { content: ""; position: absolute; left: -7px; bottom: 12px; width: 12px; height: 12px; background: var(--menu); border-left: 1px solid var(--border); border-bottom: 1px solid var(--border); transform: rotate(45deg); }
+body[data-anya="corner"] .anya-bubble::before { left: auto; right: -7px; transform: rotate(-135deg); }
+.anya-bubble .who { display: flex; align-items: center; gap: 6px; color: var(--accent); font-size: 11px; font-weight: 600; letter-spacing: .04em; margin-bottom: 3px; }
+.anya-bubble .who .tag { color: var(--muted); font: 10px var(--mono); font-weight: 400; margin-left: auto; padding-left: 12px; }
+.anya-bubble .text { min-height: 1.45em; }
+.anya-bubble .quote { font-style: italic; }
+.anya-bubble .src { display: block; color: var(--muted); font-size: 11px; margin: 1px 0 6px; }
+.anya-bubble .src::before { content: "— "; }
+.anya-bubble .said { display: block; }
+.anya-bubble .caret { display: inline-block; width: 6px; height: 12px; background: var(--accent); margin-left: 2px; vertical-align: -1px; animation: anya-blink .9s steps(1) infinite; }
+@keyframes anya-blink { 50% { opacity: 0; } }
+.anya-menu { position: fixed; z-index: 60; min-width: 180px; background: var(--menu); border: 1px solid var(--border); border-radius: var(--r); padding: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.anya-menu button { display: flex; width: 100%; padding: 7px 10px; border-radius: 5px; text-align: left; }
+.anya-menu button:hover { background: var(--surface); }
+.anya-menu .sep { height: 1px; background: var(--border); margin: 4px 2px; }
+#anya-card .seg { flex: none; } #anya-card input[type=range].anya-range { width: 180px; flex: none; }
+#anya-card.off .row:not(:first-child) { opacity: .5; }
+.titlebar .mark { overflow: hidden; } .titlebar .mark img { width: 100%; height: 100%; object-fit: cover; display: block; }
+@media (prefers-reduced-motion: reduce) { .anya .wobble, .anya .shadow, .anya.talking .squish { animation: none !important; } }

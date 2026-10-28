@@ -177,6 +177,13 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] Prova gli stili e gli slider; **Apply to all tools** lo mette ovunque, **None** lo toglie.
 - [ ] Chiudi e riapri Hermes: ogni tool ha ancora il suo sfondo.
 
+## 24. Anya
+- [ ] All'avvio ti saluta in basso a sinistra; cliccala: risponde, si schiaccia e si sente la voce (non troppo alta).
+- [ ] Cambia tool: cambia posa (Pixel Art typing, Document Converter impress...). Tasto destro: **Game quote** cita e poi commenta.
+- [ ] Lascia Hermes fermo qualche minuto: finge di lavorare (caffè, muffin...); cliccala e torna.
+- [ ] In Settings prova grandezza, volume, **Window corner**, wobble Off/Lively, "Talks on her own"; chiudi e riapri: resta tutto.
+- [ ] Quando un download finisce fa festa; quando fallisce te lo dice.
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.

@@ -24,8 +24,9 @@ Aggiornato a ogni tranche. Le prove a mano sono in [TEST-TODO.md](TEST-TODO.md),
 | T22 | Pixel Art: dimensione pixel, luminosità/contrasto/saturazione, palette incluse / Lospec / incollate / dall'immagine, dithering, griglia, export piccolo o fino a 4K, più immagini insieme | v0.7.0 |
 | pulizia | Gallery: uscendo e rientrando durante la lettura l'elenco ora compare; playlist con video non disponibili ora si aggiungono (prima "Add to queue" non faceva niente); un solo avviso cookie invece di tre; errori di ffmpeg con il nome del file; test più affidabili (galleria locale) | v0.7.0 |
 | fix | Pattern Generator: onde come su Durves (ogni punto si sposta di tutta l'ampiezza, il rumore decide solo la direzione; stessa scala di Durves, quindi gli stessi numeri danno lo stesso risultato) | v0.7.1 |
-| fix | Pixel Art: l'anteprima resta della stessa grandezza qualunque sia la dimensione dei pixel | da pubblicare |
-| T23 | Sfondi per ogni tool: un PNG trasparente disegnato appena visibile dietro la pagina, editor dal pulsante Backdrop (9 stili, visibilità, grandezza, dettaglio, sfocatura, posizione, colore, specchio, "applica a tutti") | da pubblicare |
+| fix | Pixel Art: l'anteprima resta della stessa grandezza qualunque sia la dimensione dei pixel | v0.8.0 |
+| T23 | Sfondi per ogni tool: un PNG trasparente disegnato appena visibile dietro la pagina, editor dal pulsante Backdrop (9 stili, visibilità, grandezza, dettaglio, sfocatura, posizione, colore, specchio, "applica a tutti") | v0.8.0 |
+| T24 | Anya, la compagna: faccia nel logo e nell'icona, pose per ogni tool con i colori di Hermes, wobble, schiacciata quando parla con la voce, idle che "lavora", consigli, citazioni dei videogiochi con commento suo, festa quando un lavoro finisce; impostazioni per grandezza, volume, posizione, wobble, quanto parla | v0.8.0 |
 
 Provato e scartato: FLAC da SpotiFLAC (server non funzionanti), Mornye (app per telefono, estensioni di terzi).
 FLAC abbandonato per scelta (ottobre 2026).

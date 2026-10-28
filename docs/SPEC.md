@@ -296,6 +296,20 @@ hermes-data/
   Size, Detail, Softness, Position (left/center/right), Colour (amber/white/image), fade towards the content, mirror;
   Sample, None, Apply to all tools. Images are copied to `hermes-data/backdrops`; everything survives restarts.
 
+## 24. Anya (T24)
+
+- A companion with personality, never in the way: Anya stands in the bottom corner of the sidebar (the tool list
+  scrolls above her) or in the window's bottom-right corner, wobbles gently, squishes while she talks and plays a
+  short voice sound (volume adjustable). Her face is the app mark and icon.
+- Each page has its own pose (Libbie art recoloured to Hermes' amber/cream/graphite). After a few quiet minutes she
+  goes idle "working" on something (coffee, muffin, paperwork...); clicking her brings her back with a line about
+  where you are.
+- She talks in English, playful and a little tsundere but sweet: tips for the tool you're on, a cheer when a job
+  ends, a word when one fails, random encouragement, and short video-game quotes cited with their source and
+  followed by her own comment. On her own she talks only after a quiet stretch (Never / Sometimes / Often).
+- Right-click: say something, game quote, hush for an hour, mute, settings, hide. Settings: on/off, voice, volume,
+  size, position, wobble (off / gentle / lively), how often she talks. Everything survives restarts.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.

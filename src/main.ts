@@ -6,6 +6,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { availableMonitors, getCurrentWindow, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { icon, IconName } from "./icons";
+import { anyaCard, anyaPage, faceUrl, startAnya } from "./anya";
 import { backdropButton, closeBackdropEditor, showBackdrop } from "./backdrop";
 import { banner, clearers, flushSettings, h, modal, settings, saveSettings, saveSettingsSoon } from "./core";
 import { mountBadge, mountTasks, mountToolDots } from "./activity";
@@ -247,7 +248,7 @@ async function renderSettings(view: HTMLElement) {
     saveSettings({ maxConcurrent: n });
   };
   prefs.append(par);
-  el.append(prefs);
+  el.append(prefs, anyaCard());
   el.querySelector("#data-path")!.textContent = path;
   (el.querySelector("#open-data") as HTMLElement).onclick = () => revealItemInDir(path);
   const status = el.querySelector("#update-status")!;
@@ -284,6 +285,7 @@ function open(id: string) {
   view.replaceChildren();
   closeBackdropEditor();
   showBackdrop(mod.id);
+  anyaPage(mod.id);
   mod.render(view);
   if (mod.info) {
     // modules may render asynchronously: attach once their header exists
@@ -373,24 +375,28 @@ function sortable(list: HTMLElement) {
   });
 }
 
+// the list scrolls above Anya's corner (.anya-dock), so nothing in the sidebar ends up under her
+const sideList = h(`<div class="side-list"></div>`);
+side.append(sideList, h(`<div class="anya-corner"></div>`));
 function renderSidebar() {
-  side.replaceChildren();
+  sideList.replaceChildren();
   for (const section of ["tools", "system"] as const) {
-    side.append(section === "tools" ? h(`<div class="label">Tools</div>`) : h(`<div class="spacer"></div>`));
+    sideList.append(section === "tools" ? h(`<div class="label">Tools</div>`) : h(`<div class="spacer"></div>`));
     for (const m of visible().filter((m) => m.section === section)) {
       const n = h(`<button class="nav ${m.id === current ? "on" : ""}" data-id="${m.id}">${icon(m.icon)}<span>${m.name}</span>${m.section === "tools" ? `<i class="nav-dot"></i>` : ""}</button>`);
       n.onclick = () => open(m.id);
       if (m.id === "downloads") n.append(badge);
-      side.append(n);
+      sideList.append(n);
     }
   }
 }
 renderSidebar();
+startAnya();
 const refreshDots = mountToolDots((id) => side.querySelector<HTMLElement>(`.nav[data-id="${id}"] .nav-dot`), () => current);
 
 // ---------- window: title bar + size/position remembered in settings.json (portable) ----------
 const win = getCurrentWindow();
-document.getElementById("mark")!.innerHTML = icon("feather");
+document.getElementById("mark")!.innerHTML = `<img src="${faceUrl}" alt="">`;
 document.getElementById("ver")!.textContent = version;
 const wc = (id: string, ic: IconName, fn: () => void) => {
   const b = document.getElementById(id)!;

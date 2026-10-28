@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anya Companion</title>
+<style>
+:root {
+  --bg: #141416; --chrome: #101012; --surface: #1b1b1e; --field: #121214; --menu: #1d1d21;
+  --border: #2a2a2f; --text: #ececef; --muted: #8b8b94; --track: #2a2a2f;
+  --accent: #f2a33a; --accent-fg: #1a1205; --accent-soft: rgba(242,163,58,.10); --accent-line: rgba(242,163,58,.35);
+  --ok: #58c48b; --danger: #e5484d;
+  --font: "Segoe UI Variable", "Inter", system-ui, sans-serif; --mono: "Cascadia Mono", Consolas, monospace; --r: 8px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.45 var(--font); overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.app { display: grid; grid-template-rows: 36px 1fr; height: 100vh; }
+.titlebar { background: var(--chrome); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; padding: 0 12px; }
+.mark { width: 22px; height: 22px; border-radius: 6px; overflow: hidden; background: var(--accent); flex: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.mark img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.titlebar b { font-weight: 600; } .titlebar .ver { color: var(--muted); font: 11px var(--mono); }
+.body { display: flex; min-height: 0; }
+nav { width: 208px; flex: none; background: var(--chrome); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+.nav-list { flex: 1; min-height: 0; overflow: auto; padding: 14px 10px; }
+/* her own corner at the bottom of the sidebar: the list scrolls above it, nothing ends up under her */
+.dock { flex: none; height: 146px; display: none; background: linear-gradient(transparent, rgba(242,163,58,.035)); }
+body.with-anya .dock { display: block; }
+nav h6 { margin: 4px 8px 8px; color: var(--muted); font-size: 11px; letter-spacing: .08em; font-weight: 500; }
+nav h6.sys { margin-top: 14px; }
+.nav { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; color: var(--muted); cursor: pointer; position: relative; width: 100%; text-align: left; }
+.nav:hover { color: var(--text); background: var(--surface); }
+.nav.on { color: var(--text); background: var(--surface); }
+.nav.on::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px; border-radius: 2px; background: var(--accent); }
+svg.i { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+main { flex: 1; min-width: 0; overflow: auto; }
+.page { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; max-width: 900px; }
+.head { display: flex; align-items: center; gap: 12px; } .head h3 { margin: 0; font-size: 17px; font-weight: 600; } .head .sub { color: var(--muted); font-size: 12px; }
+.head .right { margin-left: auto; display: flex; gap: 8px; }
+.card { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.card h4 { margin: 0; font-size: 13px; font-weight: 600; }
+.row { display: flex; align-items: center; gap: 12px; } .row .k { flex: 1; } .row .k .sub { color: var(--muted); font-size: 12px; }
+.input { height: 36px; background: var(--field); border: 1px solid var(--border); border-radius: var(--r); padding: 0 12px; color: var(--muted); display: flex; align-items: center; flex: 1; }
+.btn { height: 32px; padding: 0 12px; border-radius: var(--r); border: 1px solid var(--border); background: var(--surface); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.btn:hover { border-color: #3a3a40; } .btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+.btn.ghost { border-color: transparent; color: var(--muted); } .btn.ghost:hover { color: var(--text); background: var(--surface); }
+.bar { height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; } .bar i { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+.qitem { display: flex; justify-content: space-between; color: var(--text); } .qitem span { color: var(--muted); font: 12px var(--mono); }
+.switch { position: relative; width: 34px; height: 20px; flex: none; } .switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.switch i { position: absolute; inset: 0; border-radius: 10px; background: var(--track); transition: background .15s; pointer-events: none; }
+.switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #cfcfd6; transition: transform .15s; }
+.switch input:checked + i { background: var(--accent); } .switch input:checked + i::after { transform: translateX(14px); background: var(--accent-fg); }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+.seg button { height: 30px; padding: 0 12px; color: var(--muted); font-size: 12px; } .seg button + button { border-left: 1px solid var(--border); }
+.seg button:hover { color: var(--text); } .seg button.on { background: var(--accent-soft); color: var(--accent); }
+.mock { border-style: dashed; } .mock .sub { color: var(--muted); font-size: 12px; }
+.mock .row { flex-wrap: wrap; gap: 8px; }
+::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-thumb { background: #2c2c31; border-radius: 4px; } ::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- Anya ---------- */
+.anya { position: fixed; left: 6px; bottom: 0; width: 196px; height: 146px; z-index: 50; pointer-events: none; }
+.anya[hidden] { display: none; }
+.anya .stage { position: absolute; left: 10px; bottom: 6px; width: 120px; height: 136px; pointer-events: auto; cursor: pointer; }
+.anya .shadow { position: absolute; left: 22px; right: 22px; bottom: 2px; height: 10px; border-radius: 50%; background: radial-gradient(rgba(0,0,0,.55), transparent 70%); animation: shadow 3.6s ease-in-out infinite; }
+.anya .wobble { position: absolute; inset: 0; transform-origin: 50% 100%; animation: wobble 3.6s ease-in-out infinite; }
+.anya .squish { position: absolute; inset: 0; transform-origin: 50% 100%; }
+.anya.talking .squish { animation: squish .32s ease-in-out infinite; }
+.anya.pop .squish { animation: pop .42s cubic-bezier(.3,1.6,.5,1); }
+.anya.poke .squish { animation: poke .45s ease-out; }
+.anya img.pose { position: absolute; left: 0; right: 0; bottom: 0; margin: auto; max-width: 100%; max-height: 100%; display: block; filter: drop-shadow(0 2px 6px rgba(0,0,0,.35)); user-select: none; -webkit-user-drag: none; }
+.anya .stage:hover img.pose { filter: drop-shadow(0 2px 6px rgba(0,0,0,.35)) drop-shadow(0 0 10px rgba(242,163,58,.25)); }
+@keyframes wobble { 0%, 100% { transform: rotate(-1.6deg) translateY(0); } 50% { transform: rotate(1.6deg) translateY(-3px); } }
+@keyframes shadow { 0%, 100% { transform: scaleX(1); opacity: .9; } 50% { transform: scaleX(.88); opacity: .7; } }
+@keyframes squish { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.06, .93); } }
+@keyframes pop { 0% { transform: scale(.82, 1.1); opacity: .2; } 100% { transform: scale(1, 1); opacity: 1; } }
+@keyframes poke { 0% { transform: scale(1.12, .86); } 45% { transform: scale(.94, 1.08); } 100% { transform: scale(1, 1); } }
+/* idle: she "works" on something; a tiny chip says so */
+.anya .busy { position: absolute; left: 96px; bottom: 112px; padding: 2px 8px; border-radius: 999px; background: var(--menu); border: 1px solid var(--border); color: var(--muted); font: 11px var(--mono); white-space: nowrap; opacity: 0; transform: translateY(4px); transition: .25s; }
+.anya.idle .busy { opacity: 1; transform: none; }
+.anya .busy b { color: var(--accent); font-weight: 400; animation: dots 1.2s steps(4) infinite; display: inline-block; width: 2.2ch; overflow: hidden; vertical-align: bottom; }
+@keyframes dots { from { width: 0; } to { width: 2.2ch; } }
+/* speech bubble: to her right, over the page edge */
+.bubble { position: fixed; left: 140px; bottom: 92px; width: max-content; max-width: 300px; z-index: 51; background: var(--menu); border: 1px solid var(--border); border-radius: 12px 12px 12px 4px;
+  padding: 10px 12px 10px; box-shadow: 0 10px 30px rgba(0,0,0,.45); opacity: 0; transform: translateY(6px) scale(.98); transform-origin: 0 100%; transition: opacity .18s, transform .18s; pointer-events: none; }
+.bubble.show { opacity: 1; transform: none; pointer-events: auto; }
+.bubble::before { content: ""; position: absolute; left: -7px; bottom: 12px; width: 12px; height: 12px; background: var(--menu); border-left: 1px solid var(--border); border-bottom: 1px solid var(--border); transform: rotate(45deg); }
+.bubble .who { display: flex; align-items: center; gap: 6px; color: var(--accent); font-size: 11px; font-weight: 600; letter-spacing: .04em; margin-bottom: 3px; }
+.bubble .who .tag { color: var(--muted); font: 10px var(--mono); font-weight: 400; margin-left: auto; }
+.bubble .text { min-height: 1.45em; } .bubble .text .src { color: var(--muted); font-size: 11px; display: block; margin-top: 2px; }
+.bubble .caret { display: inline-block; width: 6px; height: 12px; background: var(--accent); margin-left: 2px; vertical-align: -1px; animation: blink .9s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.menu { position: fixed; z-index: 60; min-width: 180px; background: var(--menu); border: 1px solid var(--border); border-radius: var(--r); padding: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.menu button { display: flex; width: 100%; padding: 7px 10px; border-radius: 5px; text-align: left; gap: 8px; align-items: center; }
+.menu button:hover { background: var(--surface); }
+.menu .sep { height: 1px; background: var(--border); margin: 4px 2px; }
+@media (prefers-reduced-motion: reduce) { .anya .wobble, .anya .shadow, .anya.talking .squish { animation: none; } }
+</style>
+</head>
+<body class="with-anya">
+<div class="app">
+  <div class="titlebar"><span class="mark"><img src="../src/assets/anya/face.png" alt=""></span><b>Hermes</b><span class="ver">0.8.0 · Anya mockup</span></div>
+  <div class="body">
+    <nav><div class="nav-list" id="nav"></div><div class="dock"></div></nav>
+    <main><div class="page" id="page"></div></main>
+  </div>
+</div>
+
+<div class="anya" id="anya">
+  <div class="stage" id="stage" title="">
+    <div class="shadow"></div>
+    <div class="wobble"><div class="squish"><img class="pose" id="pose" alt="Anya"></div></div>
+  </div>
+  <div class="busy" id="busy"></div>
+</div>
+<div class="bubble" id="bubble" role="status" aria-live="polite"><div class="who">ANYA<span class="tag" id="tag"></span></div><div class="text" id="text"></div></div>
+
+<script>
+// ================= data =================
+const TOOLS = [
+  ["video", "Video Downloader", "Video and audio from YouTube and 1,800+ sites", '<path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>'],
+  ["spotify", "Spotify", "Songs, albums and playlists from official sources", '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'],
+  ["gallery", "Gallery Downloader", "Whole galleries from 100+ sites", '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>'],
+  ["rembg", "Background Removal", "Transparent PNGs, on your GPU", '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88"/><path d="M14.47 14.48 20 20"/><path d="M8.12 8.12 12 12"/>'],
+  ["upscale", "Image Upscale", "Real-ESRGAN, 2× to 4×", '<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>'],
+  ["converter", "Video Converter", "H.264, ProRes, WebM, GIF…", '<rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 2v20M17 2v20M2 12h20"/>'],
+  ["imgconv", "Image Converter", "Any format to any format, even SVG", '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m21 15-5-5L5 21"/>'],
+  ["docconv", "Document Converter", "DOCX, PDF, Markdown, LaTeX…", '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8"/>'],
+  ["pattern", "Pattern Generator", "Wavy dot grids", '<circle cx="5" cy="5" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="19" cy="5" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="19" r="1"/><circle cx="12" cy="19" r="1"/><circle cx="19" cy="19" r="1"/>'],
+  ["pixel", "Pixel Art", "Photos into crisp pixel art", '<rect x="3" y="3" width="18" height="18" rx="2"/>'],
+  ["demucs", "Stem Separation", "Vocals, drums, bass, other", '<path d="M2 12h2l3-8 4 16 3-10 2 4h6"/>'],
+  ["whisper", "Subtitles", "Speech to SRT, on your GPU", '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M7 15h4M15 15h2M7 11h2M13 11h4"/>'],
+  ["audible", "Audible", "Your audiobooks as M4B", '<path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>'],
+  ["thumbs", "Thumbnail Tester", "Your thumbnail next to real videos", '<rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 22h8"/>'],
+];
+const SYSTEM = [
+  ["downloads", "Downloads", "Everything running and waiting", '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'],
+  ["binaries", "Binaries", "The tools inside Hermes", '<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>'],
+  ["settings", "Settings", "How Hermes behaves", '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>'],
+];
+// which pose goes with which page (front = her default)
+const POSE = {
+  video: "34view", spotify: "support", gallery: "conference", rembg: "copymachine", upscale: "math", converter: "base",
+  imgconv: "draw", docconv: "impress", pattern: "calc", pixel: "typing", demucs: "support", whisper: "writer",
+  audible: "documentation", thumbs: "blank", downloads: "freelance", binaries: "back", settings: "front",
+};
+const IDLE = [["coffee", "brewing coffee"], ["muffin", "snack break"], ["typing", "writing a report"], ["documentation", "reading the manual"], ["copymachine", "making copies"], ["freelance", "doing paperwork"]];
+const ALL_POSES = [...new Set([...Object.values(POSE), ...IDLE.map((i) => i[0]), "front", "donation"])];
+
+// Her lines: playful, a little tsundere, always sweet. Game quotes are short and credited.
+const L = {
+  hello: [
+    "Oh. You're back. Not that I was waiting or anything.",
+    "Hermes is warmed up. I did that. You're welcome.",
+    "Ready when you are. Well, I was ready ages ago.",
+  ],
+  tool: {
+    video: ["Paste a link and I'll fetch it. Just don't make me download 4 hours of unboxings again.", "Tip: tick 'Convert to MP4 for Premiere' and your editor won't complain. Unlike me.", "Playlists work too. I'll queue every single video. Every. Single. One."],
+    spotify: ["I check every source, you know. No fan uploads sneak past me.", "Opus keeps YouTube Music's own audio. No re-encode. I'm very thorough, hmph.", "Paste a playlist. I'll find the official tracks, obviously."],
+    gallery: ["A whole gallery? Fine. I'll carry it all. Tch.", "Use the filters before you grab everything. I'm strong, not a hoarder.", "Untick the ones you don't want. I'm not reading your mind. ...Not yet."],
+    rembg: ["Backgrounds? Gone. Like my patience when you drop a 40 MB PNG.", "Try Compare: I'll run a few models side by side and you pick the best.", "BiRefNet is the fancy one. Your GPU can take it."],
+    upscale: ["Enhance! ...I always wanted to say that.", "The anime model is for drawings. Don't feed it photos, it gets weird.", "Videos take a while. I'll do it frame by frame, so be patient!"],
+    converter: ["H.264 for Premiere, ProRes if you're feeling fancy. Your call.", "GIFs? In this economy? ...Okay, fine, I'll make one.", "NVENC does the heavy lifting. I just supervise. Elegantly."],
+    imgconv: ["Image to SVG? I trace every curve myself. Be impressed.", "WebP is small, PNG keeps everything. Choose wisely, adventurer.", "Drop a pile of images. I don't mind. Much."],
+    docconv: ["Documents! Finally something civilised.", "PDF to Word is tricky, but I'll do my best. As always.", "Markdown to PDF looks great with LaTeX. Trust me, I'm a professional."],
+    pattern: ["Waves, dots, more waves. I could watch this all day. Don't tell anyone.", "Hit Random. If it's ugly, hit it again. That's the whole secret.", "Export at 4K. Go big or go home."],
+    pixel: ["Pixel art! This is where I shine. Literally, I'm made of polygons.", "Try the Game Boy palette. Trust me. It's adorable.", "A bit of dithering goes a long way."],
+    demucs: ["Vocals, drums, bass... I'll pull them apart. Gently.", "htdemucs_ft is slower but cleaner. Worth the wait, probably.", "Karaoke night? I'm not singing. ...Maybe one song."],
+    whisper: ["I'll listen and write it all down. Every 'um' included.", "Pick the language if you know it. Guessing is for amateurs.", "SRT for YouTube, VTT for the web. You're welcome."],
+    audible: ["Audiobooks, as M4B with chapters. Cosy.", "Sign in once and I'll remember. I have a great memory. Mostly."],
+    thumbs: ["Is that your thumbnail? It's... fine. Make the text bigger.", "Squint mode shows what people see at a glance. Brutal, right?", "Outliers are videos doing way better than their channel. Steal their ideas. Politely."],
+    downloads: ["Look at all that work. I did most of it, by the way.", "Everything running is here. Pause what you don't need."],
+    binaries: ["yt-dlp gets updated a lot. I keep an eye on it. Someone has to.", "Everything here runs offline. No cloud, no nonsense."],
+    settings: ["Changing things around? Don't break anything. ...I'll fix it if you do.", "You can turn me off here. Not that you'd want to. Right?"],
+  },
+  done: ["Done! Told you I could handle it.", "Finished. Do I get a muffin now?", "All done. Hmph, that was easy.", "Achievement unlocked: patience. ...Yours, I mean."],
+  failed: ["Ugh, that one failed. It wasn't my fault! Check the error, okay?", "Something broke. Don't look at me like that. Retry?", "Wasted. ...Kidding. Hit Retry."],
+  empty: ["Queue's empty. Finally, a break.", "Nothing left to do? Suspicious. Very suspicious."],
+  poke: ["Hey! Personal space!", "What? I'm busy. ...Okay, I'm not.", "You clicked me. Again. Need something?", "Stop poking. ...You can poke a little.", "I'm not cute. I'm efficient."],
+  idleBack: ["Huh? I wasn't slacking! I was... optimising.", "Ah! You saw nothing.", "Back to work. Fine."],
+  random: [
+    "Drink some water. Not because I care. Hydrated people download faster.",
+    "Remember to back up your projects. Future you will thank me.",
+    "You've been at it a while. Stretch! I'll guard the queue.",
+    "I'm not saying you're doing great. ...But you're doing great.",
+    "Fun fact: I never sleep. I just pretend to drink coffee.",
+  ],
+  quotes: [
+    ["It's dangerous to go alone! Take this.", "The Legend of Zelda"],
+    ["Hey! Listen!", "Ocarina of Time"],
+    ["The cake is a lie.", "Portal"],
+    ["Do a barrel roll!", "Star Fox 64"],
+    ["Stay a while and listen.", "Diablo"],
+    ["War. War never changes.", "Fallout"],
+    ["Praise the sun!", "Dark Souls"],
+    ["Thank you! But our princess is in another castle!", "Super Mario Bros."],
+    ["Would you kindly keep going?", "BioShock"],
+    ["Rise and shine, and smell the ashes.", "Half-Life 2"],
+    ["Kept you waiting, huh?", "Metal Gear Solid"],
+    ["It's super effective!", "Pokémon"],
+    ["Objection!", "Ace Attorney"],
+    ["A winner is you!", "Pro Wrestling"],
+    ["Nothing is true, everything is permitted.", "Assassin's Creed"],
+    ["Snake? Snake?! SNAAAKE!", "Metal Gear Solid"],
+  ],
+  // her own twists on famous lines, tied to what you do
+  twists: {
+    video: ["It's dangerous to download alone! Take this queue."],
+    gallery: ["Gotta grab 'em all!"],
+    done: ["Mission complete. Kept you waiting, huh?"],
+    failed: ["You died. ...Just kidding. Retry?"],
+    pixel: ["Insert coin to continue. Or just hit Export."],
+    thumbs: ["Objection! That thumbnail needs more contrast."],
+  },
+};
+
+// ================= state (localStorage only in this mockup; Hermes would use settings.anya) =================
+let prefs = { on: true, voice: true, volume: 30, chat: "normal" };
+try { Object.assign(prefs, JSON.parse(localStorage.getItem("anya") || "{}")); } catch {}
+const keep = () => { try { localStorage.setItem("anya", JSON.stringify(prefs)); } catch {} };
+let page = "video", idle = false, hushedUntil = 0, lastAct = Date.now(), lastSaid = "";
+const pick = (a) => { let x; do x = a[Math.floor(Math.random() * a.length)]; while (a.length > 1 && x === lastSaid); return x; };
+const voice = new Audio("../src/assets/anya/voice.mp3");
+
+// ================= Anya =================
+const anya = document.getElementById("anya"), poseImg = document.getElementById("pose"), bubble = document.getElementById("bubble");
+ALL_POSES.forEach((p) => { const i = new Image(); i.src = `../src/assets/anya/${p}.png`; }); // preload: switching never flashes
+function setPose(p) {
+  if (poseImg.dataset.p === p) return;
+  poseImg.dataset.p = p; poseImg.src = `../src/assets/anya/${p}.png`;
+  anya.classList.remove("pop"); void anya.offsetWidth; anya.classList.add("pop");
+}
+let typing = 0, hideTimer = 0;
+function say(text, { tag = "", src = "" } = {}) {
+  if (!prefs.on) return;
+  lastSaid = text;
+  clearTimeout(hideTimer); clearInterval(typing);
+  wake();
+  document.getElementById("tag").textContent = tag;
+  const box = document.getElementById("text");
+  box.textContent = "";
+  bubble.classList.add("show");
+  anya.classList.add("talking");
+  if (prefs.voice) { voice.volume = prefs.volume / 100; voice.currentTime = 0; voice.play().catch(() => {}); }
+  let n = 0;
+  const caret = document.createElement("span"); caret.className = "caret";
+  typing = setInterval(() => {
+    n += 1 + (Math.random() < 0.3);
+    box.textContent = text.slice(0, n); box.append(caret);
+    if (n >= text.length) {
+      clearInterval(typing); caret.remove();
+      if (src) { const s = document.createElement("span"); s.className = "src"; s.textContent = `— ${src}`; box.append(s); }
+      anya.classList.remove("talking");
+      voice.pause();
+      hideTimer = setTimeout(() => bubble.classList.remove("show"), 2600 + text.length * 55);
+    }
+  }, 28);
+}
+function line(kind) { // a line for `kind`, sometimes swapped for her twist on a game quote
+  const tw = L.twists[kind === "tool" ? page : kind];
+  if (tw && Math.random() < 0.25) return say(pick(tw), { tag: "quote-ish" });
+  if (kind === "tool") return say(pick(L.tool[page] ?? L.random), { tag: pageName().toLowerCase() });
+  if (kind === "quote") { const [q, s] = pick(L.quotes); return say(q, { tag: "quote", src: s }); }
+  say(pick(L[kind]));
+}
+const pageName = () => [...TOOLS, ...SYSTEM].find((t) => t[0] === page)[1];
+
+// idle: after a quiet while she "works" on something; clicking brings her back with a line about where you are
+function wake() {
+  lastAct = Date.now();
+  if (!idle) return;
+  idle = false; anya.classList.remove("idle"); setPose(POSE[page] ?? "front");
+}
+function goIdle() {
+  if (idle || bubble.classList.contains("show")) return;
+  const [p, what] = pick(IDLE);
+  idle = true; setPose(p);
+  document.getElementById("busy").innerHTML = `${what}<b>...</b>`;
+  anya.classList.add("idle");
+}
+const IDLE_AFTER = 25_000; // mockup: 25 s (in Hermes ~3 min)
+setInterval(() => {
+  if (!prefs.on) return;
+  const quiet = Date.now() - lastAct;
+  if (!idle && quiet > IDLE_AFTER) goIdle();
+  // chatter: rare, never while hushed, and only if she has been quiet a while
+  const every = { quiet: Infinity, normal: 90_000, chatty: 35_000 }[prefs.chat];
+  if (!idle && Date.now() > hushedUntil && quiet > every && Math.random() < 0.5) Math.random() < 0.45 ? line("quote") : line(Math.random() < 0.5 ? "tool" : "random");
+}, 5000);
+
+const stage = document.getElementById("stage");
+stage.onclick = () => {
+  if (idle) { wake(); return Math.random() < 0.4 ? say(pick(L.idleBack)) : line("tool"); }
+  anya.classList.remove("poke"); void anya.offsetWidth; anya.classList.add("poke");
+  const r = Math.random();
+  r < 0.25 ? say(pick(L.poke)) : r < 0.6 ? line("tool") : line("quote");
+};
+bubble.onclick = () => bubble.classList.remove("show");
+stage.oncontextmenu = (e) => {
+  e.preventDefault();
+  menu([
+    ["Say something", () => line("tool")],
+    ["Game quote", () => line("quote")],
+    null,
+    [Date.now() < hushedUntil ? "Chat again" : "Hush for an hour", () => { hushedUntil = Date.now() < hushedUntil ? 0 : Date.now() + 3600_000; say(hushedUntil ? "Fine. I'll be quiet. ...For an hour." : "Yay! I mean. Okay."); }],
+    [prefs.voice ? "Mute her voice" : "Unmute her voice", () => { prefs.voice = !prefs.voice; keep(); renderPage(); }],
+    ["Hide Anya", () => setOn(false)],
+  ], e.clientX, e.clientY);
+};
+function menu(items, x, y) {
+  document.querySelector(".menu")?.remove();
+  const m = document.createElement("div"); m.className = "menu";
+  for (const it of items) {
+    if (!it) { m.append(Object.assign(document.createElement("div"), { className: "sep" })); continue; }
+    const b = document.createElement("button"); b.textContent = it[0]; b.onclick = () => { m.remove(); it[1](); }; m.append(b);
+  }
+  document.body.append(m);
+  m.style.left = `${x}px`; m.style.top = `${Math.min(y, innerHeight - m.offsetHeight - 8)}px`;
+  setTimeout(() => addEventListener("pointerdown", (e) => { if (!m.contains(e.target)) m.remove(); }, { once: true }));
+}
+function setOn(on) {
+  prefs.on = on; keep();
+  anya.hidden = !on; document.body.classList.toggle("with-anya", on);
+  if (!on) bubble.classList.remove("show");
+  renderPage();
+}
+
+// ================= the fake Hermes around her =================
+function renderNav() {
+  const it = ([id, name, , ic]) => `<button class="nav ${id === page ? "on" : ""}" data-id="${id}"><svg class="i" viewBox="0 0 24 24">${ic}</svg>${name}</button>`;
+  document.getElementById("nav").innerHTML = `<h6>TOOLS</h6>${TOOLS.map(it).join("")}<h6 class="sys">SYSTEM</h6>${SYSTEM.map(it).join("")}`;
+}
+let jobs = [["Sunset timelapse (4K)", 62], ["Lo-fi mix · MP3", 18], ["Studio vlog #12", 0]];
+function renderPage() {
+  const [, name, sub] = [...TOOLS, ...SYSTEM].find((t) => t[0] === page);
+  const el = document.getElementById("page");
+  if (page === "settings") {
+    el.innerHTML = `<div class="head"><div><h3>Settings</h3><div class="sub">${sub}</div></div></div>
+      <div class="card"><h4>Anya</h4>
+        <div class="row"><div class="k">Companion<div class="sub">Anya sits in the corner, gives tips and the odd game quote</div></div><label class="switch"><input type="checkbox" id="s-on" ${prefs.on ? "checked" : ""}><i></i></label></div>
+        <div class="row"><div class="k">Voice<div class="sub">A short sound when she talks</div></div><label class="switch"><input type="checkbox" id="s-voice" ${prefs.voice ? "checked" : ""}><i></i></label></div>
+        <div class="row"><div class="k">Volume<div class="sub">${prefs.volume}%</div></div><input type="range" id="s-vol" min="5" max="100" value="${prefs.volume}" style="accent-color:var(--accent);width:160px"></div>
+        <div class="row"><div class="k">How often she talks on her own<div class="sub">She always answers when you click her or when a job ends</div></div>
+          <div class="seg" id="s-chat">${["quiet", "normal", "chatty"].map((c) => `<button data-c="${c}" class="${prefs.chat === c ? "on" : ""}">${c[0].toUpperCase() + c.slice(1)}</button>`).join("")}</div></div>
+      </div>`;
+    el.querySelector("#s-on").onchange = (e) => setOn(e.target.checked);
+    el.querySelector("#s-voice").onchange = (e) => { prefs.voice = e.target.checked; keep(); };
+    el.querySelector("#s-vol").oninput = (e) => { prefs.volume = +e.target.value; keep(); e.target.previousElementSibling.querySelector(".sub").textContent = `${prefs.volume}%`; };
+    el.querySelector("#s-chat").onclick = (e) => { const b = e.target.closest("[data-c]"); if (b) { prefs.chat = b.dataset.c; keep(); renderPage(); } };
+  } else {
+    el.innerHTML = `<div class="head"><div><h3>${name}</h3><div class="sub">${sub}</div></div><div class="right"><button class="btn sm ghost">Clear</button><button class="btn sm ghost">Info</button></div></div>
+      <div class="row"><div class="input">Paste a link or drop files…</div><button class="btn">Fetch</button><button class="btn primary">Add to queue</button></div>
+      <div class="card"><div class="row"><h4 style="flex:1">Queue</h4><span class="sub" style="color:var(--muted);font-size:12px">${jobs.length} items</span></div>
+        ${jobs.map(([t, p]) => `<div class="qitem">${t}<span>${p ? p + "%" : "waiting"}</span></div><div class="bar"><i style="width:${p}%"></i></div>`).join("")}</div>`;
+  }
+  // mockup-only controls to try her reactions
+  el.insertAdjacentHTML("beforeend", `<div class="card mock"><h4>Mockup controls</h4><div class="sub">Only here to try her reactions. Right-click Anya for her menu.</div>
+    <div class="row">
+      <button class="btn sm" data-sim="done">A job finishes</button><button class="btn sm" data-sim="failed">A job fails</button>
+      <button class="btn sm" data-sim="empty">Queue empties</button><button class="btn sm" data-sim="quote">Game quote</button>
+      <button class="btn sm" data-sim="idle">Go idle now</button><button class="btn sm" data-sim="hello">Hello</button>
+      <button class="btn sm" data-sim="toggle">${prefs.on ? "Hide Anya" : "Show Anya"}</button>
+    </div></div>`);
+  el.querySelectorAll("[data-sim]").forEach((b) => (b.onclick = () => {
+    const k = b.dataset.sim;
+    if (k === "toggle") return setOn(!prefs.on);
+    if (k === "idle") { lastAct = 0; bubble.classList.remove("show"); return goIdle(); }
+    if (k === "done") { setPose("donation"); setTimeout(() => setPose(POSE[page] ?? "front"), 4000); }
+    line(k);
+  }));
+}
+document.getElementById("nav").onclick = (e) => {
+  const b = e.target.closest("[data-id]"); if (!b) return;
+  page = b.dataset.id; renderNav(); renderPage();
+  wake(); setPose(POSE[page] ?? "front");
+  // first visit to a tool: a tip, but not every time (she's helpful, not clingy)
+  if (Math.random() < 0.35 && Date.now() > hushedUntil) setTimeout(() => line("tool"), 500);
+};
+addEventListener("pointerdown", () => (lastAct = Date.now()), true);
+addEventListener("keydown", () => (lastAct = Date.now()), true);
+
+renderNav(); renderPage();
+setPose("front");
+setOn(prefs.on);
+setTimeout(() => line("hello"), 900);
+</script>
+</body>
+</html>
