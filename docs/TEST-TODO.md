@@ -165,6 +165,10 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] Importa una palette da un link di Lospec (es. lospec.com/palette-list/sweetie-16) o incolla dei codici colore.
 - [ ] Più immagini, **Export** in Small, Original e 4K: i pixel restano nitidi; con **Grid** c'è la griglia.
 
+## Pulizia (giro 6)
+- [ ] Gallery: incolla un link, cambia tool mentre legge, torna: l'elenco compare senza rileggere.
+- [ ] Video Downloader: una playlist con qualche video eliminato si aggiunge alla coda (avviso "N unavailable videos skipped").
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.
@@ -180,4 +184,3 @@ Tieni **Eagle aperto** per i test con Eagle.
 - `scripts/t3-test.mjs`: tutto ok tranne il controllo sul testo d'errore di ffmpeg.
 - `scripts/t4-test.mjs`: si ferma al 2° download per un bug del test (non dell'app); MP4/1080p/Eagle/playlist non ancora coperti in automatico.
 - `scripts/t5-7-test.mjs` con `ONLY=rembg,upscale`: **tutto passato** (download modelli con conferma, PNG trasparente, slider, sfondo pieno + crop, compare con tempi, Keep, upscale immagine 4×, upscale video 2× con audio, pulizia temp).
-- `scripts/t5-7-test.mjs` sezione gallery: anteprima, filtri (estensioni, risoluzione), selezione/deselezione **ok**; il download non è stato verificato fino in fondo perché Wikimedia ha limitato il mio IP (429) dopo molti test. Hermes ha reagito correttamente con la pausa da 5 e poi 10 minuti. Da riprovare con una tua galleria.

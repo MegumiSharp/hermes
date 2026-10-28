@@ -589,7 +589,10 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
                 count += 1;
             }
         } else if !line.is_empty() && !line.starts_with("[hermes]") && !line.contains('=') {
-            last_line = line.to_string();
+            // ffmpeg ends with "Error opening input files: …": the line before it names the file
+            if !(line.starts_with("Error opening input files") && last_line.starts_with("Error opening input file ")) {
+                last_line = line.to_string();
+            }
         }
         let update = match parser {
             Parser::YtDlp => line.strip_prefix("[hermes] ").and_then(|p| {

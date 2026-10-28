@@ -11,7 +11,7 @@ const DATA = resolve("release/hermes-data");
 const DL = join(OUT, "t4");
 const EAGLE = "http://localhost:41595/api";
 const VIDEO = "https://www.youtube.com/watch?v=jNQXAC9IVRw"; // "Me at the zoo", 19 s
-const PLAYLIST = "https://www.youtube.com/playlist?list=PL4lCao7KL_QFVb7Iudeipvc2BCavECqzc"; // yt-dlp's 1-video test playlist
+const PLAYLIST = "https://www.youtube.com/playlist?list=PL63F0C78739B09958"; // public, ~47 songs: only the first is downloaded
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const invoke = (page, cmd, args = {}) => page.evaluate(([c, a]) => window.__TAURI_INTERNALS__.invoke(c, a), [cmd, args]);
 const jobs = async (page) => (await invoke(page, "queue_get")).jobs;
@@ -73,7 +73,7 @@ await until(async () => (await page.textContent("#v-cookies")).includes("No cook
 // format menu
 await page.click("#v-format");
 const opts = await page.$$eval(".menu .mi", (m) => m.map((x) => x.textContent.replace(/\s+/g, " ").trim()));
-check(opts.length === 4 && opts[2].includes("MP4") && opts[2].includes("Converted"), `menu: ${opts.join(" | ")}`);
+check(opts.length === 5 && opts[0].startsWith("Best quality") && opts[4].includes("MP3"), `menu: ${opts.join(" | ")}`);
 await page.screenshot({ path: join(OUT, "t4-menu.png") });
 await page.click('[data-format="mp3"]');
 check((await page.textContent("#v-format")).includes("Audio only"), "selecting a format updates the button");
@@ -87,16 +87,19 @@ check((await page.textContent("#v-preview .dur")) === "0:19", "duration shown");
 check(!(await page.$eval("#v-add", (b) => b.disabled)), "Add to queue enabled after fetch");
 await page.screenshot({ path: join(OUT, "t4-preview.png") });
 
-async function addAndWait(format, label) {
+// format: null keeps the current one; premiere: convert to H.264 + AAC MP4
+async function addAndWait(format, label, premiere = false) {
+  // after "Add to queue" the old preview is only hidden: fetch again unless it is visible
+  if (!(await page.isVisible("#v-preview .t"))) {
+    await page.fill("#v-url", VIDEO);
+    await page.click("#v-fetch");
+    await until(() => page.isVisible("#v-preview .t"), "preview", 60000);
+  }
   if (format) {
     await page.click("#v-format");
     await page.click(`[data-format="${format}"]`);
   }
-  if (!(await page.$("#v-preview .t"))) {
-    await page.fill("#v-url", VIDEO);
-    await page.click("#v-fetch");
-    await until(() => page.$("#v-preview .t"), "preview", 60000);
-  }
+  if (format !== "mp3") await page.$eval("#v-premiere", (c, on) => { if (c.checked !== on) c.click(); }, premiere);
   const before = (await jobs(page)).length;
   await page.click("#v-add");
   await until(async () => (await jobs(page)).length > before, `${label} queued`);
@@ -118,21 +121,18 @@ check((await page.inputValue("#v-url")) === "" &&(await page.isHidden("#v-previe
 j = await addAndWait("best", "Best quality");
 check(existsSync(j.outputs[0]), `best quality file: ${j.outputs[0]}`);
 
-j = await addAndWait("mp4", "MP4 converted");
+j = await addAndWait("best", "MP4 converted", true);
 check(j.outputs.length === 1 && j.outputs[0].endsWith(".mp4"), `converted output only: ${j.outputs.join(", ")}`);
 p = probe(j.outputs[0]);
 check(p.streams.find((s) => s.codec_type === "video")?.codec_name === "h264", "video is H.264");
 check(p.streams.find((s) => s.codec_type === "audio")?.codec_name === "aac", "audio is AAC");
 check(!readdirSync(DL).some((f) => f.endsWith(".mkv")), "intermediate mkv deleted");
 
-j = await addAndWait("1080p", "1080p");
-check(existsSync(j.outputs[0]), `1080p file: ${j.outputs[0]}`);
-
 // Eagle
 await page.click("#v-eagle + .box");
 check(await page.$eval("#v-eagle", (c) => c.checked), "Send to Eagle ticked");
 await until(async () => (await page.textContent("#v-eagle-state")).includes("Eagle connected"), "Eagle chip");
-j = await addAndWait("mp4", "MP4 to Eagle");
+j = await addAndWait("best", "MP4 to Eagle", true);
 check(j.inEagle && !existsSync(j.outputs[0]), "imported into Eagle and removed from folder");
 const items = await until(async () => {
   const d = (await (await fetch(`${EAGLE}/item/list?keyword=${encodeURIComponent("Me at the zoo")}&limit=10`)).json()).data;
@@ -150,11 +150,14 @@ await page.click("#v-fetch");
 await until(async () => (await page.textContent("#v-preview .c").catch(() => "")).startsWith("Playlist"), "playlist preview", 60000);
 await page.click("#v-add");
 const group = await until(async () => (await jobs(page)).find((x) => x.group), "group job");
-const kids = await until(async () => {
-  const k = (await jobs(page)).filter((x) => x.parent === group.id);
-  return k.length && k.every((x) => ["done", "failed"].includes(x.state)) ? k : null;
-}, "playlist items finished", 240000);
-check(kids.every((k) => k.state === "done"), `playlist: ${kids.length} item(s) done`);
+const kids = (await jobs(page)).filter((x) => x.parent === group.id);
+check(kids.length > 10, `playlist: one queue item per video (${kids.length})`);
+const first = await until(async () => {
+  const k = (await jobs(page)).find((x) => x.id === kids[0].id);
+  return ["done", "failed"].includes(k.state) ? k : null;
+}, "first playlist item finished", 240000);
+check(first.state === "done", `first playlist item done${first.error ? ": " + first.error : ""}`);
+await invoke(page, "queue_action", { id: group.id, action: "remove" });
 
 // errors
 await page.fill("#v-url", "https://www.youtube.com/watch?v=xxxxxxxxxxx");

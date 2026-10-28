@@ -48,7 +48,14 @@ export function markBroken(site: string) {
 }
 
 /** Cookie settings + manual import. `reason` = why browser extraction failed. Resolves true if anything changed. */
+let openModal: Promise<boolean> | null = null; // several probes failing at once share one modal
+
 export function cookiesModal(site: string, reason?: string): Promise<boolean> {
+  openModal ??= showCookiesModal(site, reason).finally(() => (openModal = null));
+  return openModal;
+}
+
+function showCookiesModal(site: string, reason?: string): Promise<boolean> {
   const s = SITES[site];
   return new Promise(async (resolve) => {
     const found = await browsers;

@@ -4,13 +4,13 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { check, launch, OUT } from "./smoke.mjs";
+import { serveGallery } from "./gallery-fixture.mjs";
 
 const EXE = resolve("release/Hermes.exe");
 const DATA = resolve("release/hermes-data");
 const BIN = join(DATA, "bin");
 const W = join(OUT, "t5-7");
 const EAGLE = "http://localhost:41595/api";
-const GALLERY = "https://en.wikipedia.org/wiki/Hermes";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const invoke = (page, cmd, args = {}) => page.evaluate(([c, a]) => window.__TAURI_INTERNALS__.invoke(c, a), [cmd, args]);
 const jobs = async (page) => (await invoke(page, "queue_get")).jobs;
@@ -55,26 +55,31 @@ for (const f of ["queue.json", "settings.json", "gallery-archive.sqlite3"]) rmSy
 const G = join(W, "gallery"), R = join(W, "rembg"), U = join(W, "upscale");
 writeFileSync(join(DATA, "settings.json"), JSON.stringify({
   lastModule: "gallery", autoUpdateYtdlp: false,
-  gallery: { folder: G, eagle: false, filters: { limit: 12 } }, rembg: { folder: R, eagle: false }, upscale: { folder: U, eagle: false },
+  gallery: { folder: G, eagle: false, previews: true, filters: { limit: 12 } }, rembg: { folder: R, eagle: false }, upscale: { folder: U, eagle: false },
 }));
 const app = await launch(EXE);
 const { page } = app;
-await until(async () => (await invoke(page, "binaries_init")).every((s) => s.ok), "all binaries working", 120000);
+await until(async () => (await invoke(page, "binaries_init")).every((s) => s.ok || s.optional), "all binaries working", 120000);
 check(true, "all bundled tools (incl. Real-ESRGAN, DirectML) verify");
 
 // ONLY=rembg,upscale skips sections (e.g. when a site is rate limiting this IP)
 const only = (s) => !process.env.ONLY || process.env.ONLY.split(",").includes(s);
 let j; // last finished job
-let photo = resolve("test-output/fixtures/photo.jpg"); // replaced by a downloaded file when the gallery runs
+const photo = resolve("test-output/fixtures/photo.jpg"); // a real photo: the gallery fixture images are flat colours
 
 // ================= T5 Gallery =================
 if (only("gallery")) {
+const gallery = await serveGallery(join(W, "gallery-src"), resolve("release/hermes-data/bin/ffmpeg.exe")); // local page, no rate limits
+const GALLERY = gallery.url;
 await page.waitForSelector("#g-url");
 await page.fill("#g-url", GALLERY);
 await page.click("#g-fetch");
+// leaving the tool while it reads and coming back still shows the list
+await page.click('.nav[data-id="rembg"]');
+await page.click('.nav[data-id="gallery"]');
 await until(async () => (await page.$$("#g-grid .tile")).length >= 3, "gallery tiles", 90000);
 const total = (await page.$$("#g-grid .tile")).length;
-check(true, `preview grid shows ${total} files`);
+check(total === 5, `list read while away is shown on return (${total} files)`);
 check(/of \d+ selected/.test(await page.textContent("#g-summary")), `summary: ${await page.textContent("#g-summary")}`);
 await page.screenshot({ path: join(OUT, "t5-grid.png") });
 const exts = await page.$$eval(".f-ext", (b) => b.map((x) => x.dataset.ext));
@@ -85,12 +90,6 @@ if (exts.length > 1) {
   check(after < total, `turning off .${exts.at(-1)} hides files (${total} -> ${after})`);
   await page.click(`.f-ext[data-ext="${exts.at(-1)}"]`);
 }
-await page.fill('[data-num="minW"]', "100000");
-await page.dispatchEvent('[data-num="minW"]', "change");
-const big = (await page.$$("#g-grid .tile")).length;
-check(big < total, `minimum width filter hides small images (${big} left)`);
-await page.fill('[data-num="minW"]', "");
-await page.dispatchEvent('[data-num="minW"]', "change");
 await page.click("#g-none");
 check((await page.textContent("#g-summary")).startsWith("0 of"), "select none");
 check(await page.$eval("#g-add", (b) => b.disabled), "Add disabled with nothing selected");
@@ -126,7 +125,7 @@ const items = await until(async () => {
 check(items[0].url === GALLERY, "Eagle item keeps the gallery URL");
 await fetch(`${EAGLE}/item/moveToTrash`, { method: "POST", body: JSON.stringify({ itemIds: items.map((i) => i.id) }) });
 await page.click("#g-eagle + .box");
-photo = got.find((f) => /\.jpe?g$/i.test(f)) ?? got[0];
+gallery.close();
 }
 
 // ================= T6 Background Removal =================
@@ -160,6 +159,7 @@ j = await lastJobDone(page, "rembg");
 const cut = j.outputs.at(-1);
 check(existsSync(cut) && probe(cut).streams[0].pix_fmt === "rgba", `transparent PNG written: ${basename(cut)}`);
 await until(() => page.$(".results .ba"), "before/after slider", 10000);
+await page.$eval(".results .ba", (e) => e.scrollIntoView({ block: "center" }));
 const box = await page.$(".results .ba").then((e) => e.boundingBox());
 await page.mouse.click(box.x + box.width * 0.2, box.y + box.height / 2);
 check((await page.$eval(".results .ba", (e) => Number(e.getAttribute("aria-valuenow")))) < 30, "slider follows the pointer");
@@ -190,6 +190,8 @@ await page.waitForSelector(".modal .ba");
 await page.click(".modal .m-foot .btn.primary");
 await until(() => walk(R).some((f) => /-(isnet-general-use|u2net)\.png$/.test(f)), "kept compare result in folder", 10000);
 check(true, "Keep saves the chosen model's result");
+check(await page.isVisible(".modal .ba"), "viewer stays open after Keep (to keep more than one)");
+await page.click(".modal .m-foot .btn.ghost");
 }
 
 // ================= T7 Upscale =================

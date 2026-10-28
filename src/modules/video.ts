@@ -360,9 +360,13 @@ export function renderVideo(view: HTMLElement) {
     if (!info) return;
     const cookies = await cookieArgs(SITE);
     const channel = info.channel ?? info.uploader ?? "";
+    // unavailable videos (deleted, region-locked) come back without a title: skip them
+    const entries = (info.entries ?? []).filter((e) => e.title);
+    const skipped = (info.entries?.length ?? 0) - entries.length;
     const job = info._type === "playlist"
-      ? { module: "video", title: info.title, pill: pillOf(prefs).replace(" · MP4", ""), children: (info.entries ?? []).map((e) => videoJob(e, e.channel ?? e.uploader ?? channel, prefs, cookies)) }
+      ? { module: "video", title: info.title, pill: pillOf(prefs).replace(" · MP4", ""), children: entries.map((e) => videoJob(e, e.channel ?? e.uploader ?? channel, prefs, cookies)) }
       : videoJob(info, channel, prefs, cookies);
+    if (job.children && skipped) banner({ id: "video-skipped", icon: "alert", text: `${skipped} unavailable video${skipped > 1 ? "s" : ""} skipped.` });
     if (job.children && !job.children.length) return banner({ id: "video-empty", tone: "warn", icon: "alert", text: "This playlist has no videos." });
     await addJobs([job]);
     urlInput.value = prefs.url = "";

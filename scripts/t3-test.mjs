@@ -45,11 +45,13 @@ writeFileSync(join(DATA, "settings.json"), JSON.stringify({ autoUpdateYtdlp: fal
 // ---------- 1. first run extracts the payload ----------
 let app = await launch(EXE);
 let { page } = app;
-await until(async () => (await page.$$eval("#bin-list .chip", (c) => c.map((x) => x.textContent))).join() === "Working,Working,Working", "3 tools working", 90000);
+// optional tools (Pandoc, Tectonic, Poppler) are not bundled: they show "Not installed"
+const allWorking = async (page) => { const c = (await page.$$eval("#bin-list .chip", (c) => c.map((x) => x.textContent))).filter((t) => t !== "Not installed"); return c.length >= 3 && c.every((t) => t === "Working"); };
+await until(() => allWorking(page), "bundled tools working", 90000);
 check(true, "first run: yt-dlp, gallery-dl, FFmpeg extracted and working");
 for (const f of ["yt-dlp.exe", "gallery-dl.exe", "ffmpeg.exe", "ffprobe.exe"]) check(existsSync(join(BIN, f)), `${f} in hermes-data/bin`);
 const versions = JSON.parse(readFileSync(join(BIN, "versions.json"), "utf8"));
-check(Object.keys(versions).length === 3, `versions.json records ${Object.keys(versions).join(", ")}`);
+check(["yt-dlp", "gallery-dl", "ffmpeg"].every((k) => versions[k]), `versions.json records ${Object.keys(versions).join(", ")}`);
 await page.screenshot({ path: join(OUT, "t3-binaries.png") });
 await app.close();
 await sleep(1000);
@@ -60,7 +62,7 @@ unlinkSync(join(BIN, "ffmpeg.exe"));
 writeFileSync(join(BIN, "versions.json"), JSON.stringify({ ...versions, "yt-dlp": old }));
 app = await launch(EXE);
 ({ page } = app);
-await until(async () => (await page.$$eval("#bin-list .chip", (c) => c.map((x) => x.textContent))).join() === "Working,Working,Working", "tools working after repair", 60000);
+await until(() => allWorking(page), "tools working after repair", 60000);
 check(existsSync(join(BIN, "ffmpeg.exe")), "deleted ffmpeg.exe re-extracted on launch");
 check(JSON.parse(readFileSync(join(BIN, "versions.json"), "utf8"))["yt-dlp"].date === versions["yt-dlp"].date, "yt-dlp older than the bundled one is replaced by it");
 await app.close();

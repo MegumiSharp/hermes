@@ -90,14 +90,20 @@ function passes(i: Item, f: Filters): boolean {
 /** Python set literal of the chosen files for gallery-dl's image-filter (JSON strings are valid Python). */
 const filterExpr = (keys: string[]) => `(filename + '.' + extension) in {${keys.map((k) => JSON.stringify(k)).join(", ")}}`;
 
+// module scope: a read started on an earlier visit finishes into the page that is open now (`ui`),
+// and coming back to the tool shows the list already read instead of reading it again
+let items: Item[] = [];
+let source = { url: "", category: "" };
+let probing = 0;
+let reading = false;
+const live = liveStatus("gallery-read");
+let ui = { loading: (_on: boolean) => {}, show: () => {}, fail: (_msg: string) => {} };
+
 export function renderGallery(view: HTMLElement) {
   const { state: prefs, save } = memory<Prefs>("gallery", { folder: "", eagle: true, url: "", offKeys: [], previews: false, filters: DEFAULT_FILTERS });
   prefs.filters = { ...DEFAULT_FILTERS, ...prefs.filters, types: { ...DEFAULT_FILTERS.types, ...prefs.filters.types } };
   /** Manual picks survive restarts: stored as the keys of the files turned off. */
   const saveOff = () => { prefs.offKeys = items.filter((i) => i.off).map((i) => i.key); save(); };
-  let items: Item[] = [];
-  let source = { url: "", category: "" };
-  let probing = 0;
 
   const page = h(`<div class="page gallery">
     <div class="head">
@@ -245,8 +251,12 @@ export function renderGallery(view: HTMLElement) {
   $("#g-all").onclick = () => { items.forEach((i) => (i.off = false)); saveOff(); renderGrid(); };
   $("#g-none").onclick = () => { items.forEach((i) => (i.off = true)); saveOff(); renderGrid(); };
 
-  const live = liveStatus("gallery-read");
   $("#g-live").append(live.el);
+  ui = {
+    loading: (on) => { if (on) { renderGrid(); $("#g-summary").textContent = ""; } grid.classList.toggle("loading", on); },
+    show: () => { grid.classList.remove("loading"); refreshCookies(); renderFilters(); renderGrid(); },
+    fail: (msg) => fail(msg),
+  };
 
   // ----- probe -----
   async function probe() {
@@ -254,9 +264,8 @@ export function renderGallery(view: HTMLElement) {
     if (!url) return;
     const id = ++probing;
     items = [];
-    renderGrid();
-    $("#g-summary").textContent = "";
-    grid.classList.add("loading");
+    reading = true;
+    ui.loading(true);
     live.set(`Reading the gallery (up to ${prefs.filters.limit} files)`);
     await binariesReady;
     const run = (cookies: string[]) => invoke<unknown[]>("tool_json", {
@@ -268,27 +277,27 @@ export function renderGallery(view: HTMLElement) {
     try {
       result = await run(await siteCookies(known));
     } catch (e) {
-      if (!(known && isCookieError(String(e)))) return id === probing && fail(String(e));
+      if (!(known && isCookieError(String(e)))) return id === probing && done(() => ui.fail(String(e)));
       markBroken(known);
       cookiesModal(known, String(e)).then((c) => c && probe());
       live.set("Browser cookies unreadable: reading without them");
-      try { result = await run([]); } catch (e2) { return id === probing && fail(String(e2)); }
+      try { result = await run([]); } catch (e2) { return id === probing && done(() => ui.fail(String(e2))); }
     }
     if (id !== probing) return;
+    reading = false;
     live.done();
-    grid.classList.remove("loading");
     const parsed = parse(result);
     items = parsed.items;
     if (url === prefs.url) items.forEach((i) => (i.off = prefs.offKeys.includes(i.key))); // restore picks for the same URL
     else { prefs.url = url; prefs.offKeys = []; save(); }
     source = { url, category: parsed.category || known };
-    refreshCookies();
-    renderFilters();
-    renderGrid();
+    ui.show();
     if (!items.length) {
-      fail(parsed.queued ? "This page only links to other galleries. Open one of them instead." : "No files found at this URL.");
+      ui.fail(parsed.queued ? "This page only links to other galleries. Open one of them instead." : "No files found at this URL.");
     }
   }
+  /** A read that ended without a list. */
+  function done(then: () => void) { reading = false; live.done(); then(); return true; }
   function fail(msg: string) {
     live.done();
     grid.classList.remove("loading");
@@ -335,7 +344,9 @@ export function renderGallery(view: HTMLElement) {
   renderGrid();
   // restore after a restart: the typed URL, and the last fetched gallery with its picks
   $<HTMLInputElement>("#g-url").value = settings.galleryDraft ?? prefs.url;
-  if (prefs.url && $<HTMLInputElement>("#g-url").value === prefs.url) probe();
+  const typed = $<HTMLInputElement>("#g-url").value;
+  if (reading) ui.loading(true); // still reading from an earlier visit: it will fill this page
+  else if (!(items.length && source.url === typed) && prefs.url && typed === prefs.url) probe(); // first visit after a restart
   mountQueue(page, "gallery");
   view.append(page);
 }

@@ -6,6 +6,7 @@ import { mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { basename, join, resolve } from "node:path";
 import { check, launch, OUT } from "./smoke.mjs";
+import { serveGallery } from "./gallery-fixture.mjs";
 
 const EXE = resolve("release/Hermes.exe");
 const DATA = resolve("release/hermes-data");
@@ -131,22 +132,24 @@ check((await page.$$(".stats .stat")).length === 0, "stats hidden when turned of
 await page.click('.nav[data-id="settings"]');
 await page.check("#show-stats");
 
-// 7. Gallery: list view by default + title filter
+// 7. Gallery: previews on + title filter (since T13 there is no list without previews)
 await page.click('.nav[data-id="gallery"]');
-await page.fill("#g-url", "https://en.wikipedia.org/wiki/Hermes");
+const gallery = await serveGallery(join(W, "gallery-src"), resolve("release/hermes-data/bin/ffmpeg.exe")); // local page, no rate limits
+await page.fill("#g-url", gallery.url);
 await page.click("#g-fetch");
-await until(async () => (await page.$$("#g-grid .g-row")).length >= 3, "gallery list rows", 90000);
-check(await page.$eval("#g-grid", (g) => g.classList.contains("as-list")), "list view is the default (no remote thumbnails)");
-const all = (await page.$$("#g-grid .g-row")).length;
-const name = (await page.textContent("#g-grid .g-row b")).split(/[\s_.()-]+/).find((w) => w.length > 4);
+await until(async () => /of \d+ selected/.test(await page.textContent("#g-summary")), "gallery read", 90000);
+await page.check("#g-previews");
+await until(async () => (await page.$$("#g-grid .tile")).length >= 3, "gallery tiles", 30000);
+const all = (await page.$$("#g-grid .tile")).length;
+const name = "sunset"; // two of the fixture's five files
 await page.fill('[data-text="titleNot"]', name);
 await sleep(300);
-const fewer = (await page.$$("#g-grid .g-row")).length;
+const fewer = (await page.$$("#g-grid .tile")).length;
 check(fewer < all, `"Title excludes ${name}" hides matching files (${all} -> ${fewer})`);
 await page.fill('[data-text="titleNot"]', "");
-await page.check("#g-previews");
-check(!!(await page.$("#g-grid .tile img")), "Show previews switches to thumbnails");
+check(!!(await page.$("#g-grid .tile img")), "Show previews shows thumbnails");
 await page.uncheck("#g-previews");
+gallery.close();
 
 check(app.errors.length === 0, `no console errors ${app.errors.join(" | ")}`);
 await app.close();
