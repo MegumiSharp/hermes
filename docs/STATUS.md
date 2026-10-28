@@ -14,6 +14,7 @@ Aggiornato a ogni tranche. Le prove a mano sono in [TEST-TODO.md](TEST-TODO.md),
 | fix | Impostazioni non più perse riaprendo un tool durante un'operazione (tutti i tool) | non pubblicata |
 | T15 | Spotify: ogni fonte verificata (niente osu!/cover/fan upload), feedback durante la lettura del link, barra graduale | non pubblicata |
 | T16 | Video Downloader audio: copertina quadrata, testi ufficiali incorporati nell'MP3, WAV 48 kHz con pill "Montaggio" | non pubblicata |
+| T20a | Image Converter: PNG/JPG/WebP/AVIF/TIFF/BMP/GIF/ICO in tutte le direzioni, ridimensionamento, immagine → SVG vettoriale | non pubblicata |
 | T19 | Statistiche d'uso solo locali, esportabili da Settings per l'ottimizzazione, senza dati personali | non pubblicata |
 | T18 | Thumbnail Tester: ultimi canali e ricerche come scelte rapide, date vere dei video, Outliers (visualizzazioni ÷ iscritti), Find similar | non pubblicata |
 | T17b | Feedback dal vivo in ogni attesa (Video, Gallery, Thumbnail Tester, Audible, Binaries); ordine dei tool trascinabile nei Settings | non pubblicata |
@@ -24,9 +25,8 @@ FLAC abbandonato per scelta (ottobre 2026).
 
 ## Da fare (in ordine)
 
-1. **T20 Convertitore**: documenti (DOCX, PDF, Markdown, LaTeX, HTML, EPUB, ODT), PDF in immagini/testo, immagini
-   (JPG, PNG, WebP...), immagine in vettoriale (PNG → SVG). Componenti pesanti scaricati solo se confermi;
-   in ogni tool si possono eliminare modelli e componenti non più usati.
+1. **T20b Convertitore documenti**: DOCX, PDF, Markdown, LaTeX, HTML, EPUB, ODT tra loro, PDF in immagini/testo.
+   Componenti pesanti scaricati solo se confermi; in ogni tool si possono eliminare modelli e componenti non più usati.
 2. **T21 Pattern Generator** (idea da durves.com, scritto da zero): griglia di punti deformata a onde con matrice,
    dimensione, raggio, ampiezza, onde, frequenza, colori; formati 1:1 / 16:9 / 9:16 / 4:5; sfondo trasparente o colore;
    dado per motivi casuali e preset; export PNG fino a 4K e SVG vettoriale, invio a Eagle; tutto ricordato alla chiusura.

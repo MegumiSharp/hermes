@@ -91,6 +91,15 @@ pub enum Step {
         #[serde(default)]
         prefer: Vec<String>,
     },
+    /// Raster image to SVG in process (vector.rs). `mode` color|bw, `detail` high|balanced|simple.
+    Vectorize {
+        input: String,
+        output: String,
+        #[serde(default)]
+        mode: String,
+        #[serde(default)]
+        detail: String,
+    },
     /// Download one Audible book and convert it to M4B (src-tauri/src/audible.rs).
     Audible {
         asin: String,
@@ -379,6 +388,18 @@ async fn run(id: String) {
                     j.note = note;
                 }
                 Ok(vec![])
+            }
+            Step::Vectorize { input, output, mode, detail } => {
+                let last = job.outputs.last().cloned().unwrap_or_default();
+                let input = fill_placeholders(&input, &last);
+                tick(&id, 0.0, "Tracing to SVG".into());
+                log_line(&id, &format!("> Tracing to SVG ({mode}, {detail} detail): {input}"));
+                let out = output.clone();
+                match tokio::task::spawn_blocking(move || crate::vector::trace(&input, &out, &mode, &detail)).await {
+                    Ok(Ok(())) => Ok(vec![output]),
+                    Ok(Err(e)) => Err(Stop::Failed(e)),
+                    Err(e) => Err(Stop::Failed(e.to_string())),
+                }
             }
             Step::Audible { asin, title, author, duration, folder } => {
                 crate::audible::download_book(&id, &asin, &title, &author, duration, &folder).await

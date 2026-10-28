@@ -145,6 +145,11 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] Usa Hermes normalmente per qualche giorno. Poi Settings → **Usage statistics** → **Export…** e mandami il file: dentro ci sono tempi di avvio, durata di lavori e attese, errori, senza nomi di file, link o titoli.
 - [ ] Se non vuoi che registri, spegni l'interruttore; **Clear** cancella tutto.
 
+## 19. Image Converter (giro 4)
+- [ ] Trascina qualche immagine (anche una foto HEIC del telefono) e convertila in JPG, WebP, AVIF, ICO: i file finiscono nella cartella scelta, l'originale non viene mai sovrascritto.
+- [ ] Un PNG con trasparenza in JPG: lo sfondo diventa bianco.
+- [ ] **SVG** su un logo: prova Full colour / Black and white e i tre livelli di dettaglio; apri l'SVG in Illustrator o nel browser.
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.

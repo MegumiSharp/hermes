@@ -549,7 +549,7 @@ input.num { width: 72px; height: 30px; padding: 0 8px; border: 1px solid var(--b
 /* ---------- native controls drawn by Hermes (UI rule: nothing may look like Windows) ---------- */
 /* <select class="select">: customizable select (Chromium 135+), same look as the .menu dropdown */
 select.select, select.select::picker(select) { appearance: base-select; }
-select.select { cursor: pointer; justify-content: space-between; }
+select.select { cursor: pointer; justify-content: space-between; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* the chosen option stays on one line */
 select.select:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 1px; }
 select.select::picker-icon { content: ""; width: 16px; height: 16px; background: var(--muted); transition: rotate .15s;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") center / contain no-repeat; }

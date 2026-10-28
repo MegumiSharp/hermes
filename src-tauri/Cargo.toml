@@ -29,6 +29,7 @@ tauri-plugin-dialog = "2"
 ort = { version = "=2.0.0-rc.15", features = ["directml"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "bmp", "tiff", "gif"] }
 sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
+vtracer = "0.6.5"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

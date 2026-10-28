@@ -256,6 +256,13 @@ hermes-data/
 - Settings > Usage statistics: count since date, Export… (save dialog: system snapshot, summary per tool and wait with
   median/p90 and top errors, raw events) and Clear.
 
+## 19. Image Converter (T20a)
+
+- In: PNG, JPG, WebP, AVIF, HEIC, BMP, TIFF, GIF, ICO. Out: PNG, JPG, WebP (high = lossless), AVIF, TIFF, BMP, GIF, ICO
+  (256 × 256, transparent padding) or SVG (traced with vtracer, colour or black and white, three detail levels).
+- Size: keep or cap the long side (3840 … 256), never enlarging. Formats without alpha get a white background.
+  Same format as the source saves as "<name> (converted)". Optional copy to Eagle. Nothing to download.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.

@@ -11,6 +11,7 @@ mod rembg;
 mod stats;
 mod update;
 mod usage;
+mod vector;
 
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;

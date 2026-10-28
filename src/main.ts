@@ -18,6 +18,7 @@ import { renderRembg } from "./modules/rembg";
 import { renderUpscale } from "./modules/upscale";
 import { renderSpotify } from "./modules/spotify";
 import { renderConverter } from "./modules/converter";
+import { renderImgConv } from "./modules/imgconv";
 import { renderAudible } from "./modules/audible";
 import { renderDemucs } from "./modules/demucs";
 import { renderWhisper } from "./modules/whisper";
@@ -80,6 +81,14 @@ const modules: Module[] = [
       about: "Converts videos between formats, resizes them up or down (720p to 4K), changes frame rate and quality. Also extracts audio or makes GIFs.",
       formats: "MP4, MKV, MOV, WebM, AVI and more in; MP4 H.264/H.265 (GPU), ProRes 422, WebM VP9, GIF, MP3, WAV out.",
       engine: "FFmpeg (NVENC on NVIDIA GPUs)",
+    },
+  },
+  {
+    id: "imgconv", name: "Image Converter", icon: "fileImage", section: "tools", render: renderImgConv,
+    info: {
+      about: "Changes an image's format or size (never enlarges), or traces it into an SVG vector for logos, icons and drawings. Transparency is kept where the format supports it, otherwise it becomes white.",
+      formats: "PNG, JPG, WebP, AVIF, HEIC, BMP, TIFF, GIF, ICO in; PNG, JPG, WebP, AVIF, TIFF, BMP, GIF, ICO (256 × 256) or SVG out.",
+      engine: "FFmpeg + vtracer (vector tracing, built in)",
     },
   },
   {
