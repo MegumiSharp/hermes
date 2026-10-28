@@ -141,6 +141,23 @@ fn save_upload(request: tauri::ipc::Request<'_>) -> Result<String, String> {
     Ok(path.display().to_string())
 }
 
+/// Writes raw bytes (body) to the absolute path in header `x-path` (URI-encoded), creating its folder.
+/// Used for files made in the frontend (Pattern Generator PNG exports).
+#[tauri::command]
+fn write_file(request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else { return Err("expected raw bytes".into()) };
+    let path = urlencoding_decode(request.headers().get("x-path").and_then(|v| v.to_str().ok()).ok_or("no path")?);
+    let path = Path::new(&path);
+    if !path.is_absolute() {
+        return Err("path must be absolute".into());
+    }
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    fs::write(path, bytes).map_err(|e| e.to_string())?;
+    Ok(path.display().to_string())
+}
+
 /// Header values are ASCII; the frontend sends the name with encodeURIComponent.
 fn urlencoding_decode(s: &str) -> String {
     let b = s.as_bytes();
@@ -238,6 +255,7 @@ pub fn run() {
             module_paths,
             write_job_file,
             save_upload,
+            write_file,
             copy_file,
             make_dirs,
         ])

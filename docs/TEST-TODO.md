@@ -156,6 +156,10 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] Un file Markdown in Word, HTML, EPUB e PDF; un .tex in PDF (la prima volta LaTeX scarica i suoi pacchetti: qualche minuto).
 - [ ] Binaries: LibreOffice, Pandoc, Tectonic, Poppler si possono rimuovere; **Check models** mostra **Delete** su ogni modello e sul runtime AI.
 
+## 21. Pattern Generator (giro 5)
+- [ ] Muovi i cursori: l'anteprima cambia subito. Prova i formati 16:9 e 9:16, **Random**, salva un preset e riaprilo.
+- [ ] **Export PNG** a 4K con e senza sfondo (senza = trasparente, ottimo come overlay in Premiere) ed **Export SVG** (aprilo in Illustrator).
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.

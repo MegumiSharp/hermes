@@ -20,6 +20,7 @@ import { renderSpotify } from "./modules/spotify";
 import { renderConverter } from "./modules/converter";
 import { renderImgConv } from "./modules/imgconv";
 import { renderDocConv } from "./modules/docconv";
+import { renderPattern } from "./modules/pattern";
 import { renderAudible } from "./modules/audible";
 import { renderDemucs } from "./modules/demucs";
 import { renderWhisper } from "./modules/whisper";
@@ -98,6 +99,13 @@ const modules: Module[] = [
       about: "Converts documents in every useful direction: Word, OpenDocument and RTF to PDF with the layout kept, PDF to editable Word, to page images or text, Markdown, LaTeX, web pages and e-books between each other, slides and spreadsheets to PDF.",
       formats: "DOCX, ODT, RTF, DOC, PPTX, XLSX, PDF, Markdown, LaTeX, HTML, EPUB, TXT in; PDF, DOCX, ODT, RTF, Markdown, HTML, EPUB, LaTeX, TXT, PNG/JPG pages out.",
       engine: "Pandoc, Tectonic (LaTeX), Poppler, LibreOffice: each downloaded only when a conversion needs it",
+    },
+  },
+  {
+    id: "pattern", name: "Pattern Generator", icon: "grip", section: "tools", render: renderPattern,
+    info: {
+      about: "Generates wavy dot patterns for backgrounds, thumbnails and overlays: grid size, dot radius, wave amplitude, waves and frequency, colours, 1:1 / 16:9 / 9:16 / 4:5. Random looks and saved presets.",
+      formats: "PNG up to 4K (transparent or with a background) and SVG vector.", engine: "Built in (simplex noise on a canvas)",
     },
   },
   {

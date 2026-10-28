@@ -272,6 +272,14 @@ hermes-data/
   asks; LibreOffice (375 MB, 1.5 GB on disk) is unpacked from the official MSI without admin rights.
 - Binaries lists every optional component and downloaded model with Remove/Delete (rembg, Whisper, Demucs, the AI runtime).
 
+## 21. Pattern Generator (T21)
+
+- Idea from durves.com, written from scratch: a dot grid (16-152 across) displaced by seeded simplex noise (direction = noise ×
+  waves, distance = amplitude × |noise|, scale = frequency), dot radius, size of the area covered, dot colour, optional
+  background, formats 1:1 / 16:9 / 9:16 / 4:5. Live preview; Random; up to 12 named presets.
+- Export PNG at 1080p, 2160p or 4K long side (transparent without background) or SVG (one circle per dot) to the chosen
+  folder, optional copy to Eagle. Everything remembered.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.
