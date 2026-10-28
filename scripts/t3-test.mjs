@@ -178,13 +178,13 @@ await invoke(page, "queue_add", { jobs: [{ module: "video", title: "limited", st
 await until(() => page.$("[data-until]"), "cooldown banner", 30000);
 const q = await invoke(page, "queue_get");
 const minutes = (q.pausedUntil - Date.now()) / 60000;
-check(minutes > 4.5 && minutes <= 5, `first rate limit pauses ~5 min (${minutes.toFixed(2)})`);
+check(minutes > 0.8 && minutes <= 1, `first rate limit pauses ~1 min (${minutes.toFixed(2)})`); // backoff 1→2→4→8→15 since T13
 check(q.jobs.find((j) => j.title === "limited").state === "queued", "rate-limited job goes back to queued");
-check(/Resuming at \d\d:\d\d · \d:\d\d/.test(await page.textContent("[data-until]")), `countdown shown: "${await page.textContent("[data-until]")}"`);
+check(/Resuming at \d\d:\d\d · \d+:\d\d/.test(await page.textContent("[data-until]")), `countdown shown: "${await page.textContent("[data-until]")}"`);
 await page.screenshot({ path: join(OUT, "t3-cooldown.png") });
 await page.click('[data-act="resumeNow"]');
-await until(async () => (await invoke(page, "queue_get")).backoffMin === 10, "second backoff 10 min", 30000);
-check(true, "Resume now retries; second rate limit doubles backoff to 10 min");
+await until(async () => (await invoke(page, "queue_get")).backoffMin === 2, "second backoff 2 min", 30000);
+check(true, "Resume now retries; second rate limit doubles backoff to 2 min");
 server.close();
 await page.click(`[data-job="${(await jobs(page)).find((j) => j.title === "limited").id}"] [data-act="remove"]`);
 
