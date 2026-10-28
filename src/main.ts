@@ -6,6 +6,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { availableMonitors, getCurrentWindow, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { icon, IconName } from "./icons";
+import { backdropButton, closeBackdropEditor, showBackdrop } from "./backdrop";
 import { banner, clearers, flushSettings, h, modal, settings, saveSettings, saveSettingsSoon } from "./core";
 import { mountBadge, mountTasks, mountToolDots } from "./activity";
 import { mountQueue, setModuleNames } from "./queue";
@@ -281,6 +282,8 @@ function open(id: string) {
   document.querySelectorAll(".nav").forEach((n) => n.classList.toggle("on", (n as HTMLElement).dataset.id === mod.id));
   const view = document.getElementById("view")!;
   view.replaceChildren();
+  closeBackdropEditor();
+  showBackdrop(mod.id);
   mod.render(view);
   if (mod.info) {
     // modules may render asynchronously: attach once their header exists
@@ -289,7 +292,7 @@ function open(id: string) {
       if (!head) return requestAnimationFrame(attach);
       let right = head.querySelector(".right");
       if (!right) head.append((right = h(`<div class="right"></div>`)));
-      right.prepend(clearButton(mod), infoButton(mod));
+      right.prepend(backdropButton(mod.id, mod.name, () => modules.filter((m) => m.section === "tools").map((m) => m.id)), clearButton(mod), infoButton(mod));
     };
     attach();
   }

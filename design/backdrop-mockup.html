@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hermes Backdrops</title>
+<style>
+:root {
+  --bg: #141416; --chrome: #101012; --surface: #1b1b1e; --field: #121214; --menu: #1d1d21;
+  --border: #2a2a2f; --text: #ececef; --muted: #8b8b94; --track: #2a2a2f;
+  --accent: #f2a33a; --accent-fg: #1a1205; --accent-soft: rgba(242,163,58,.10); --accent-line: rgba(242,163,58,.35);
+  --font: "Segoe UI Variable", "Inter", system-ui, sans-serif; --mono: "Cascadia Mono", Consolas, monospace; --r: 8px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.4 var(--font); }
+.app { display: grid; grid-template-rows: 36px 1fr; height: 100vh; }
+.title { background: var(--chrome); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; padding: 0 12px; }
+.title b { font-weight: 600; } .title .v { color: var(--muted); font: 11px var(--mono); }
+.main { display: grid; grid-template-columns: 208px 1fr 300px; min-height: 0; }
+nav { background: var(--chrome); border-right: 1px solid var(--border); padding: 14px 10px; overflow: auto; }
+nav h6 { margin: 4px 8px 8px; color: var(--muted); font-size: 11px; letter-spacing: .08em; font-weight: 500; }
+.nav { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; color: var(--muted); cursor: pointer; position: relative; }
+.nav:hover { color: var(--text); background: var(--surface); }
+.nav.on { color: var(--text); background: var(--surface); }
+.nav.on::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 2px; border-radius: 2px; background: var(--accent); }
+.nav .has { margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-line); }
+svg.i { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* the tool page with its backdrop */
+#view { position: relative; overflow: auto; padding: 18px 22px; isolation: isolate; }
+#backdrop { position: absolute; inset: 0; pointer-events: none; z-index: -1; overflow: hidden; }
+#backdrop canvas { position: absolute; bottom: 0; }
+.page { display: flex; flex-direction: column; gap: 14px; max-width: 760px; }
+.head h2 { margin: 0; font-size: 18px; font-weight: 600; } .head p { margin: 2px 0 0; color: var(--muted); }
+.card { background: color-mix(in srgb, var(--surface) 78%, transparent); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 10px; backdrop-filter: blur(2px); }
+.field-label { color: var(--muted); font-size: 12px; }
+.input { height: 36px; background: var(--field); border: 1px solid var(--border); border-radius: 6px; padding: 0 10px; color: var(--text); display: flex; align-items: center; }
+.row { display: flex; gap: 10px; align-items: center; }
+.btn { height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { border-color: #3a3a40; }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+.btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
+.list .it { display: flex; justify-content: space-between; padding: 9px 0; border-top: 1px solid var(--border); }
+.list .it:first-child { border-top: 0; } .list .it span { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+.bar { height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; } .bar i { display: block; height: 100%; background: var(--accent); }
+
+/* settings panel (mockup only) */
+aside { background: var(--chrome); border-left: 1px solid var(--border); padding: 14px; overflow: auto; display: flex; flex-direction: column; gap: 14px; }
+aside h3 { margin: 0; font-size: 13px; font-weight: 600; } aside .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.drop { border: 1px dashed var(--border); border-radius: var(--r); padding: 14px; text-align: center; color: var(--muted); cursor: pointer; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.drop.over, .drop:hover { border-color: var(--accent-line); color: var(--text); background: var(--accent-soft); }
+.seg { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.seg button { flex: 1; height: 30px; background: transparent; border: 0; border-left: 1px solid var(--border); color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.seg button:first-child { border-left: 0; }
+.seg.grid { display: grid; grid-template-columns: repeat(3, 1fr); }
+.seg.grid button { border-left: 1px solid var(--border); border-top: 1px solid var(--border); margin: 0 0 -1px -1px; } .seg button.on { background: var(--accent-soft); color: var(--accent); }
+.slider { display: flex; flex-direction: column; gap: 4px; } .slider .top { display: flex; justify-content: space-between; } .slider .top span { color: var(--muted); font: 12px var(--mono); }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; background: transparent; margin: 0; }
+input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(var(--accent), var(--accent)) 0 / var(--p, 50%) 100% no-repeat, var(--track); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--text); margin-top: -5px; border: 0; }
+.check { display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text); }
+.check input { appearance: none; width: 16px; height: 16px; border: 1px solid var(--border); border-radius: 4px; background: var(--field); margin: 0; display: grid; place-items: center; }
+.check input:checked { background: var(--accent); border-color: var(--accent); }
+.check input:checked::after { content: ""; width: 8px; height: 4px; border: 2px solid var(--accent-fg); border-top: 0; border-right: 0; transform: translateY(-1px) rotate(-45deg); }
+.note { color: var(--muted); font-size: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-thumb { background: #2c2c31; border-radius: 4px; } ::-webkit-scrollbar-track { background: transparent; }
+@media (max-width: 860px) { .main { grid-template-columns: 1fr; } nav, aside { border: 0; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="title"><svg class="i" viewBox="0 0 24 24" style="color:var(--accent)"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><path d="M16 8 2 22"/><path d="M17.5 15H9"/></svg><b>Hermes</b><span class="v">mockup · backdrops</span></div>
+  <div class="main">
+    <nav><h6>TOOLS</h6><div id="nav"></div></nav>
+    <div id="view"><div id="backdrop"><canvas id="art"></canvas></div><div class="page" id="page"></div></div>
+    <aside>
+      <div><h3>Backdrop for <span id="tool-name"></span></h3><div class="sub">Each tool has its own image. Drop a transparent PNG; Hermes draws it as faint lines behind the page.</div></div>
+      <label class="drop" id="drop"><svg class="i" viewBox="0 0 24 24"><path d="M12 16V4"/><path d="m6 10 6-6 6 6"/><path d="M4 20h16"/></svg><span>Drop a PNG here or click to browse</span><input type="file" accept="image/png,image/webp" hidden id="file"></label>
+      <div class="row"><button class="btn sm" id="reset">Sample</button><button class="btn sm" id="none">None</button><button class="btn sm" id="all">Apply to all tools</button></div>
+      <div class="slider"><div class="field-label">Style</div><div class="seg grid" id="style"><button data-v="outline">Outline</button><button data-v="sketch">Sketch</button><button data-v="glow">Glow</button><button data-v="ghost">Ghost</button><button data-v="bw">B&amp;W</button><button data-v="duotone">Duotone</button><button data-v="halftone">Halftone</button><button data-v="pixel">Pixel</button><button data-v="color">Faded colour</button></div></div>
+      <div class="slider"><div class="top"><span class="field-label">Visibility</span><span id="v-opacity"></span></div><input type="range" id="opacity" min="4" max="60"></div>
+      <div class="slider"><div class="top"><span class="field-label">Size</span><span id="v-size"></span></div><input type="range" id="size" min="40" max="130"></div>
+      <div class="slider"><div class="top"><span class="field-label">Detail</span><span id="v-detail"></span></div><input type="range" id="detail" min="0" max="100"></div>
+      <div class="slider"><div class="top"><span class="field-label">Softness</span><span id="v-blur"></span></div><input type="range" id="blur" min="0" max="12"></div>
+      <div class="slider"><div class="field-label">Position</div><div class="seg" id="pos"><button data-v="left">Left</button><button data-v="center">Center</button><button data-v="right">Right</button></div></div>
+      <div class="slider"><div class="field-label">Colour</div><div class="seg" id="tint"><button data-v="accent">Amber</button><button data-v="white">White</button><button data-v="original">Image colours</button></div></div>
+      <label class="check"><input type="checkbox" id="fade">Fade towards the content</label>
+      <label class="check"><input type="checkbox" id="flip">Mirror</label>
+      <div class="note">Mockup only: images stay in this browser. In Hermes they would be copied to <code>hermes-data/backdrops/&lt;tool&gt;.png</code> and set from Settings or from each tool's header.</div>
+    </aside>
+  </div>
+</div>
+<script>
+const TOOLS = [
+  ["video", "Video Downloader", '<path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>'],
+  ["spotify", "Spotify", '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'],
+  ["gallery", "Gallery Downloader", '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>'],
+  ["rembg", "Background Removal", '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88"/><path d="M14.47 14.48 20 20"/><path d="M8.12 8.12 12 12"/>'],
+  ["pattern", "Pattern Generator", '<circle cx="5" cy="5" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="19" cy="5" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="19" r="1"/><circle cx="12" cy="19" r="1"/><circle cx="19" cy="19" r="1"/>'],
+  ["pixel", "Pixel Art", '<rect x="3" y="3" width="18" height="18" rx="2"/>'],
+  ["thumbs", "Thumbnail Tester", '<rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 22h8"/>'],
+];
+
+// ---- per-tool settings (localStorage is only a convenience in this mockup) ----
+const DEF = { img: "sample", style: "outline", opacity: 16, size: 92, detail: 45, blur: 0, pos: "right", tint: "accent", fade: true, flip: false };
+let store = {};
+try { store = JSON.parse(localStorage.getItem("hermes-backdrops") || "{}"); } catch {}
+const cfg = (id) => (store[id] ??= { ...DEF });
+const persist = () => { try { localStorage.setItem("hermes-backdrops", JSON.stringify(store)); } catch {} };
+let tool = "video";
+
+// ---- sample figure: an original, fully dressed anime-style bust drawn here (replace with your PNG) ----
+const SAMPLE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800">
+<g stroke="#000" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+<path fill="#3b2a4a" d="M300 70c-120 0-185 90-185 205 0 70 10 150-25 230 60-10 95-40 110-80l10-150h180l10 150c15 40 50 70 110 80-35-80-25-160-25-230 0-115-65-205-185-205z"/>
+<path fill="#f3d9c8" d="M300 145c-75 0-120 55-120 130 0 85 55 150 120 150s120-65 120-150c0-75-45-130-120-130z"/>
+<path fill="#f3d9c8" d="M265 410h70l8 60h-86z"/>
+<path fill="#2b2f3f" d="M120 800c0-150 60-310 180-330 120 20 180 180 180 330z"/>
+<path fill="#e9e6ef" d="M245 470l55 70 55-70 25 20-80 110-80-110z"/>
+<path fill="none" d="M300 540v260M215 600l-30 200M385 600l30 200"/>
+<path fill="#3b2a4a" d="M180 260c10-70 60-120 120-120s110 50 120 120c-40-10-70-40-85-75-20 40-60 65-115 70-15 0-30 3-40 5z"/>
+<path fill="#fff" d="M235 290c0-15 12-25 28-25s28 10 28 25-12 30-28 30-28-15-28-30zM309 290c0-15 12-25 28-25s28 10 28 25-12 30-28 30-28-15-28-30z"/>
+<path fill="#6b4a8f" d="M248 292c0-10 7-17 15-17s15 7 15 17-7 20-15 20-15-10-15-20zM322 292c0-10 7-17 15-17s15 7 15 17-7 20-15 20-15-10-15-20z"/>
+<path fill="none" d="M228 262c15-12 35-14 50-8M322 254c15-6 35-4 50 8M288 365c8 6 16 6 24 0"/>
+<path fill="#3b2a4a" d="M150 200c-30 60-40 140-20 220 20-70 40-120 60-150zM450 200c30 60 40 140 20 220-20-70-40-120-60-150z"/>
+<path fill="#f2a33a" d="M395 150l40-30 10 45-40 15z"/>
+</g></svg>`;
+
+const art = document.querySelector("#art"), view = document.querySelector("#view");
+const cache = new Map();
+function load(src) {
+  if (!cache.has(src)) cache.set(src, new Promise((ok, no) => {
+    const im = new Image(); im.onload = () => ok(im); im.onerror = no;
+    im.src = src === "sample" ? "data:image/svg+xml;charset=utf-8," + encodeURIComponent(SAMPLE) : src;
+  }));
+  return cache.get(src);
+}
+
+// line art from a transparent image: outer contour (alpha) + inner lines (luminance edges), then dilated
+// image looks (no line extraction): flat image → pixels → recoloured
+const tintRgb = (c) => (c.tint === "white" ? [236, 236, 239] : [242, 163, 58]);
+const tintCss = (c) => `rgb(${tintRgb(c).join(",")})`;
+function base(im, w, h, c) {
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  const x = cv.getContext("2d", { willReadFrequently: true });
+  if (c.flip) { x.translate(w, 0); x.scale(-1, 1); }
+  x.drawImage(im, 0, 0, w, h); x.setTransform(1, 0, 0, 1, 0, 0);
+  return [cv, x, x.getImageData(0, 0, w, h)];
+}
+const lum = (d, i) => (0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 255;
+const LOOKS = {
+  bw(im, w, h, c) { // grayscale with more contrast as detail goes up
+    const [cv, x, img] = base(im, w, h, c), d = img.data, k = 1 + c.detail / 50;
+    for (let i = 0; i < d.length; i += 4) { const v = Math.max(0, Math.min(255, ((lum(d, i) - 0.5) * k + 0.5) * 255)); d[i] = d[i + 1] = d[i + 2] = v; }
+    x.putImageData(img, 0, 0); return cv;
+  },
+  duotone(im, w, h, c) { // shadows = page background, highlights = line colour
+    const [cv, x, img] = base(im, w, h, c), d = img.data, hi = c.tint === "original" ? [242, 163, 58] : tintRgb(c), lo = [20, 20, 22];
+    for (let i = 0; i < d.length; i += 4) { const v = Math.pow(lum(d, i), 1.4 - c.detail / 100); for (let j = 0; j < 3; j++) d[i + j] = lo[j] + (hi[j] - lo[j]) * v; }
+    x.putImageData(img, 0, 0); return cv;
+  },
+  color(im, w, h, c) { // original colours, desaturated
+    const [cv, x, img] = base(im, w, h, c), d = img.data, s = c.detail / 100;
+    for (let i = 0; i < d.length; i += 4) { const v = lum(d, i) * 255; for (let j = 0; j < 3; j++) d[i + j] = v + (d[i + j] - v) * s; }
+    x.putImageData(img, 0, 0); return cv;
+  },
+  halftone(im, w, h, c) { // dots sized by brightness, like the Pattern Generator
+    const [, , img] = base(im, w, h, c), d = img.data, step = Math.round(14 - c.detail / 10);
+    const cv = document.createElement("canvas"); cv.width = w; cv.height = h; const x = cv.getContext("2d");
+    x.fillStyle = c.tint === "original" ? "#fff" : tintCss(c);
+    for (let y = step / 2; y < h; y += step) for (let xx = step / 2; xx < w; xx += step) {
+      const i = (Math.floor(y) * w + Math.floor(xx)) * 4, a = d[i + 3] / 255;
+      if (a < 0.1) continue;
+      if (c.tint === "original") x.fillStyle = `rgb(${d[i]},${d[i + 1]},${d[i + 2]})`;
+      const r = (step / 2) * Math.sqrt(0.15 + 0.85 * lum(d, i)) * a;
+      x.beginPath(); x.arc(xx, y, r, 0, Math.PI * 2); x.fill();
+    }
+    return cv;
+  },
+  pixel(im, w, h, c) { // chunky pixels in the line colour's shades
+    const size = Math.round(16 - c.detail / 8), sw = Math.max(1, Math.round(w / size)), sh = Math.max(1, Math.round(h / size));
+    const [small, sx] = base(im, sw, sh, c), img = sx.getImageData(0, 0, sw, sh), d = img.data, t = tintRgb(c);
+    if (c.tint !== "original") for (let i = 0; i < d.length; i += 4) { const v = Math.round(lum(d, i) * 4) / 4; for (let j = 0; j < 3; j++) d[i + j] = t[j] * (0.3 + 0.7 * v); }
+    sx.putImageData(img, 0, 0);
+    const cv = document.createElement("canvas"); cv.width = w; cv.height = h; const x = cv.getContext("2d");
+    x.imageSmoothingEnabled = false; x.drawImage(small, 0, 0, w, h); return cv;
+  },
+};
+
+function lines(im, w, h, c) {
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  const x = cv.getContext("2d", { willReadFrequently: true });
+  if (c.flip) { x.translate(w, 0); x.scale(-1, 1); }
+  x.drawImage(im, 0, 0, w, h);
+  const src = x.getImageData(0, 0, w, h), d = src.data, out = x.createImageData(w, h), o = out.data;
+  const A = (i) => d[i * 4 + 3] / 255, L = (i) => (0.3 * d[i * 4] + 0.59 * d[i * 4 + 1] + 0.11 * d[i * 4 + 2]) * A(i) / 255;
+  const thr = 0.5 - c.detail / 250; // more detail = lower threshold for inner lines
+  const mask = new Float32Array(w * h);
+  for (let y = 1; y < h - 1; y++) for (let xx = 1; xx < w - 1; xx++) {
+    const i = y * w + xx;
+    const ax = A(i + 1) - A(i - 1), ay = A(i + w) - A(i - w);
+    const edgeA = Math.min(1, Math.hypot(ax, ay) * 1.5);
+    const gx = L(i - w + 1) + 2 * L(i + 1) + L(i + w + 1) - L(i - w - 1) - 2 * L(i - 1) - L(i + w - 1);
+    const gy = L(i + w - 1) + 2 * L(i + w) + L(i + w + 1) - L(i - w - 1) - 2 * L(i - w) - L(i - w + 1);
+    const edgeL = A(i) > 0.5 ? Math.max(0, Math.min(1, (Math.hypot(gx, gy) - thr) * 3)) : 0;
+    mask[i] = c.style === "ghost" ? A(i) * 0.35 + edgeA : Math.max(edgeA, c.style === "sketch" ? edgeL * 0.8 : c.style === "glow" ? edgeL * 0.5 : edgeL * (c.detail / 100));
+  }
+  const tint = c.tint === "accent" ? [242, 163, 58] : [236, 236, 239];
+  for (let i = 0; i < w * h; i++) {
+    // dilate one pixel so lines survive downscaling
+    let m = mask[i];
+    if (c.style !== "ghost") m = Math.max(m, mask[i - 1] || 0, mask[i + 1] || 0, mask[i - w] || 0, mask[i + w] || 0) * (c.style === "sketch" ? 0.9 : 1);
+    const col = c.tint === "original" ? [d[i * 4], d[i * 4 + 1], d[i * 4 + 2]].map((v) => Math.min(255, v + 90)) : tint;
+    o[i * 4] = col[0]; o[i * 4 + 1] = col[1]; o[i * 4 + 2] = col[2]; o[i * 4 + 3] = Math.min(255, m * 255);
+  }
+  x.setTransform(1, 0, 0, 1, 0, 0); x.putImageData(out, 0, 0);
+  return cv;
+}
+
+let ticket = 0;
+async function draw() {
+  const c = cfg(tool), id = ++ticket;
+  if (!c.img) { art.hidden = true; return; }
+  let im; try { im = await load(c.img); } catch { art.hidden = true; return; }
+  if (id !== ticket) return;
+  const vh = view.clientHeight, vw = view.clientWidth;
+  const h = Math.round(vh * c.size / 100), w = Math.round(h * (im.naturalWidth || 600) / (im.naturalHeight || 800));
+  const cv = LOOKS[c.style] ? LOOKS[c.style](im, w, h, c) : lines(im, w, h, c);
+  art.style.filter = (c.blur ? `blur(${c.blur}px) ` : "") + (c.style === "glow" ? `drop-shadow(0 0 6px ${tintCss(c)})` : "");
+  art.width = w; art.height = h; art.hidden = false;
+  const x = art.getContext("2d"); x.clearRect(0, 0, w, h); x.drawImage(cv, 0, 0);
+  art.style.opacity = c.opacity / 100;
+  art.style.left = c.pos === "left" ? "0" : c.pos === "center" ? `${(vw - w) / 2}px` : "";
+  art.style.right = c.pos === "right" ? "0" : "";
+  const dir = c.pos === "left" ? "to right" : c.pos === "right" ? "to left" : "to top";
+  art.style.maskImage = art.style.webkitMaskImage = c.fade ? `linear-gradient(${dir}, #000 35%, transparent 95%)` : "none";
+}
+
+// ---- fake tool page ----
+function renderPage() {
+  const [, name] = TOOLS.find((t) => t[0] === tool);
+  document.querySelector("#page").innerHTML = `
+    <div class="head"><h2>${name}</h2><p>Paste a link or drop files. Everything stays on this PC.</p></div>
+    <div class="card"><div class="field-label">Link</div><div class="row"><div class="input" style="flex:1;color:var(--muted)">https://…</div><button class="btn primary">Fetch</button></div></div>
+    <div class="card"><div class="row" style="justify-content:space-between"><b>Queue</b><span class="field-label">2 running · 1 waiting</span></div>
+      <div class="list"><div class="it">Sunset timelapse (4K)<span>62%</span></div><div class="bar"><i style="width:62%"></i></div>
+      <div class="it">Lo-fi mix · MP3<span>18%</span></div><div class="bar"><i style="width:18%"></i></div><div class="it">Studio vlog #12<span>waiting</span></div></div></div>
+    <div class="card"><div class="field-label">Save to</div><div class="input" style="font-family:var(--mono);font-size:12px">D:\\Creator\\Downloads</div></div>`;
+}
+function renderNav() {
+  document.querySelector("#nav").innerHTML = TOOLS.map(([id, name, ic]) =>
+    `<div class="nav ${id === tool ? "on" : ""}" data-id="${id}"><svg class="i" viewBox="0 0 24 24">${ic}</svg>${name}${cfg(id).img ? '<i class="has" title="Has a backdrop"></i>' : ""}</div>`).join("");
+}
+function sync() {
+  const c = cfg(tool);
+  document.querySelector("#tool-name").textContent = TOOLS.find((t) => t[0] === tool)[1];
+  for (const k of ["opacity", "size", "detail", "blur"]) { const el = document.querySelector("#" + k); el.value = c[k]; el.style.setProperty("--p", `${(c[k] - el.min) / (el.max - el.min) * 100}%`); document.querySelector("#v-" + k).textContent = k === "detail" ? c[k] : k === "blur" ? c[k] + " px" : c[k] + "%"; }
+  for (const k of ["style", "pos", "tint"]) document.querySelectorAll(`#${k} button`).forEach((b) => b.classList.toggle("on", b.dataset.v === c[k]));
+  document.querySelector("#fade").checked = c.fade; document.querySelector("#flip").checked = c.flip;
+}
+const refresh = () => { persist(); renderNav(); sync(); draw(); };
+
+document.querySelector("#nav").onclick = (e) => { const n = e.target.closest("[data-id]"); if (n) { tool = n.dataset.id; renderPage(); refresh(); } };
+for (const k of ["opacity", "size", "detail", "blur"]) document.querySelector("#" + k).oninput = (e) => { cfg(tool)[k] = Number(e.target.value); refresh(); };
+for (const k of ["style", "pos", "tint"]) document.querySelector("#" + k).onclick = (e) => { const b = e.target.closest("button"); if (b) { cfg(tool)[k] = b.dataset.v; refresh(); } };
+document.querySelector("#fade").onchange = (e) => { cfg(tool).fade = e.target.checked; refresh(); };
+document.querySelector("#flip").onchange = (e) => { cfg(tool).flip = e.target.checked; refresh(); };
+document.querySelector("#reset").onclick = () => { cfg(tool).img = "sample"; refresh(); };
+document.querySelector("#none").onclick = () => { cfg(tool).img = ""; refresh(); };
+document.querySelector("#all").onclick = () => { const c = cfg(tool); for (const [id] of TOOLS) store[id] = { ...c }; refresh(); };
+function useFile(f) {
+  if (!f || !/image\/(png|webp)/.test(f.type)) return;
+  const r = new FileReader(); r.onload = () => { cfg(tool).img = r.result; refresh(); }; r.readAsDataURL(f);
+}
+const drop = document.querySelector("#drop");
+document.querySelector("#file").onchange = (e) => useFile(e.target.files[0]);
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); useFile(e.dataTransfer.files[0]); };
+view.ondragover = (e) => e.preventDefault();
+view.ondrop = (e) => { e.preventDefault(); useFile(e.dataTransfer.files[0]); };
+new ResizeObserver(() => draw()).observe(view);
+const q = new URLSearchParams(location.search); // ?style=bw&tint=white for quick previews
+for (const k of ["style", "tint"]) if (q.get(k)) cfg(tool)[k] = q.get(k);
+renderPage(); refresh();
+</script>
+</body>
+</html>

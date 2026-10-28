@@ -83,7 +83,7 @@ svg.i { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-widt
 .progress { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
 
 .sub { color: var(--muted); font-size: 12px; }
-.head .right { margin-left: auto; display: flex; gap: 8px; }
+.head .right { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid var(--border); border-radius: 999px; font: 11px var(--mono); color: var(--muted); white-space: nowrap; }
 .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
@@ -651,3 +651,20 @@ input[type=range].range { width: 100%; accent-color: var(--accent); cursor: poin
 .px-swatches { display: flex; flex-wrap: wrap; gap: 3px; }
 .px-swatches:empty { display: none; }
 .px-swatches i { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255,255,255,.12); }
+
+/* T23 backdrops: a faint per-tool image behind the page (backdrop.ts) */
+.backdrop { position: fixed; pointer-events: none; overflow: hidden; z-index: 0; }
+.backdrop canvas { position: absolute; bottom: 0; }
+.content.has-backdrop #view { position: relative; z-index: 1; }
+.content.has-backdrop .card { background: color-mix(in srgb, var(--surface) 80%, transparent); }
+/* beside the page (not over it): the page narrows, so the backdrop stays visible while editing */
+.bd-panel { flex: none; width: 300px; background: var(--chrome); border-left: 1px solid var(--border);
+  padding: 14px; overflow: auto; display: flex; flex-direction: column; gap: 14px; }
+.bd-top { display: flex; align-items: flex-start; gap: 8px; } .bd-top > div { flex: 1; }
+.bd-top h4 { margin: 0; font-size: 14px; font-weight: 600; } .bd-top .sub { margin-top: 2px; }
+.bd-panel .drop.big { padding: 12px; flex-wrap: wrap; justify-content: center; text-align: center; }
+.bd-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.bd-styles { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; }
+.bd-styles button { justify-content: center; border-left: 1px solid var(--border); border-top: 1px solid var(--border); margin: -1px 0 0 -1px; }
+.bd-seg { display: flex; width: 100%; } .bd-seg button { flex: 1; justify-content: center; }
+.bd-panel.empty .pt-sliders, .bd-panel.empty .bd-seg, .bd-panel.empty .bd-styles, .bd-panel.empty .check { opacity: .45; }

@@ -288,6 +288,14 @@ hermes-data/
 - Live preview of the selected image; export every image with the same settings as PNG: small (1 px per art pixel),
   original size or up to 2160 / 3840 px, always an integer scale so pixels stay crisp; optional copy to Eagle.
 
+## 23. Backdrops (T23)
+
+- Every tool can have its own background image (a transparent PNG/WebP), drawn faintly behind the page so it is
+  there without getting in the way. Set from the **Backdrop** button in the tool's header: a panel beside the page
+  with live result. Looks: Outline, Sketch, Glow, Ghost, B&W, Duotone, Halftone, Pixel, Faded colour; Visibility,
+  Size, Detail, Softness, Position (left/center/right), Colour (amber/white/image), fade towards the content, mirror;
+  Sample, None, Apply to all tools. Images are copied to `hermes-data/backdrops`; everything survives restarts.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.
