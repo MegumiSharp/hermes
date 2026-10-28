@@ -169,6 +169,9 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] Gallery: incolla un link, cambia tool mentre legge, torna: l'elenco compare senza rileggere.
 - [ ] Video Downloader: una playlist con qualche video eliminato si aggiunge alla coda (avviso "N unavailable videos skipped").
 
+## Pattern Generator, onde nuove
+- [ ] Metti gli stessi valori di Durves (es. 72, Amplitude 81, Waves 1.8, Frequency 0.0009): il disegno ha la stessa scala, con pieghe e bordo ondulato.
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.

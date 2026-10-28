@@ -6,7 +6,7 @@ export type Params = {
   grid: number; // dots across the long side (16-152)
   spread: number; // share of the canvas the grid covers (0.1-1)
   dot: number; // dot radius in px at 1080 px on the long side (0.5-8)
-  amplitude: number; // how far dots move, px at 1080 (-150..150)
+  amplitude: number; // how far dots move (× MOVE px at 1080, -150..150)
   waves: number; // turns of direction across the noise (-10..10)
   frequency: number; // noise scale (0-0.005 per px at 1080)
   seed: number;
@@ -16,6 +16,9 @@ export type Dot = { x: number; y: number; r: number };
 
 export const ASPECTS: Record<Params["aspect"], [number, number]> = { "1:1": [1, 1], "16:9": [16, 9], "9:16": [9, 16], "4:5": [4, 5] };
 const REF = 1080; // parameters are defined at this long-side size, then scaled
+// Durves' scale (matched by eye on the same settings): the same numbers give the same look
+const NOISE = 2; // noise input per px × frequency
+const MOVE = 0.26; // px moved per amplitude unit
 
 /** Canvas size for a long side of `long` px. */
 export function sizeFor(aspect: Params["aspect"], long: number): [number, number] {
@@ -66,9 +69,11 @@ export function dots(p: Params, w: number, h: number): Dot[] {
     for (let c = 0; c < cols; c++) {
       const x0 = ox + (cols === 1 ? gw / 2 : (c / (cols - 1)) * gw);
       const y0 = oy + (rows === 1 ? gh / 2 : (r / (rows - 1)) * gh);
-      const n = noise2(perm, (x0 / k) * p.frequency, (y0 / k) * p.frequency); // -1..1, smooth
-      const a = n * p.waves * Math.PI;
-      out.push({ x: x0 + Math.cos(a) * p.amplitude * k * Math.abs(n), y: y0 + Math.sin(a) * p.amplitude * k * Math.abs(n), r: p.dot * k });
+      const n = noise2(perm, (x0 / k) * p.frequency * NOISE, (y0 / k) * p.frequency * NOISE); // -1..1, smooth
+      // every dot moves the full amplitude; the noise only turns its direction, so neighbours move
+      // together (smooth sheets) and fold where the direction turns (the creases)
+      const a = n * p.waves * Math.PI, m = p.amplitude * MOVE * k;
+      out.push({ x: x0 + Math.cos(a) * m, y: y0 + Math.sin(a) * m, r: p.dot * k });
     }
   }
   return out;
