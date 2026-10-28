@@ -636,3 +636,18 @@ input[type=range].range { width: 100%; accent-color: var(--accent); cursor: poin
 .pt-stage { position: sticky; top: 0; height: min(70vh, 640px); display: grid; place-items: center; border-radius: var(--r);
   background: repeating-conic-gradient(#1a1a1d 0 25%, #141416 0 50%) 0 0 / 20px 20px; border: 1px solid var(--border); }
 .pt-stage canvas { display: block; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+
+/* Pixel Art */
+.px-strip { display: flex; flex-wrap: wrap; gap: 8px; }
+.px-strip:empty { display: none; }
+.px-thumb { position: relative; width: 72px; height: 54px; border-radius: 6px; overflow: hidden; border: 2px solid transparent; background: var(--field); cursor: pointer; }
+.px-thumb.on { border-color: var(--accent); }
+.px-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.px-x { position: absolute; top: 2px; right: 2px; display: none; padding: 2px; border-radius: 50%; background: rgba(0,0,0,.7); color: #fff; }
+.px-thumb:hover .px-x { display: flex; }
+.px-x .i { width: 11px; height: 11px; }
+#px-stage canvas { image-rendering: pixelated; }
+#px-stage .th-empty { color: var(--muted); }
+.px-swatches { display: flex; flex-wrap: wrap; gap: 3px; }
+.px-swatches:empty { display: none; }
+.px-swatches i { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255,255,255,.12); }

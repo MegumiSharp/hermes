@@ -158,6 +158,12 @@ fn write_file(request: tauri::ipc::Request<'_>) -> Result<String, String> {
     Ok(path.display().to_string())
 }
 
+/// Raw bytes of a local file (Pixel Art reads images into a canvas: asset URLs would taint it).
+#[tauri::command]
+fn read_file(path: String) -> Result<tauri::ipc::Response, String> {
+    fs::read(&path).map(tauri::ipc::Response::new).map_err(|e| e.to_string())
+}
+
 /// Header values are ASCII; the frontend sends the name with encodeURIComponent.
 fn urlencoding_decode(s: &str) -> String {
     let b = s.as_bytes();
@@ -256,6 +262,7 @@ pub fn run() {
             write_job_file,
             save_upload,
             write_file,
+            read_file,
             copy_file,
             make_dirs,
         ])

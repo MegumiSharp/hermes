@@ -61,7 +61,7 @@ if (only("memory")) {
   const [x, y, w] = await page.evaluate(() => [window.screenX, window.screenY, Math.round(window.innerWidth * devicePixelRatio)]);
   check(Math.abs(x - 120) < 20 && Math.abs(y - 90) < 40 && Math.abs(w - 1100) < 20, `window restored at saved position/size (${x},${y} ${w}px)`);
   const navs = await page.$$eval(".nav", (n) => n.map((x) => x.dataset.id));
-  check(navs.length === 16, `13 tools + Downloads + Binaries + Settings in the sidebar (${navs.join(", ")})`);
+  check(navs.length === 17, `14 tools + Downloads + Binaries + Settings in the sidebar (${navs.join(", ")})`);
   await page.uncheck('[data-tool="upscale"]');
   check(!(await page.$('.nav[data-id="upscale"]')), "hiding Upscale removes it from the sidebar");
   check(settingsFile().hiddenTools.includes("upscale"), "hidden tools saved");

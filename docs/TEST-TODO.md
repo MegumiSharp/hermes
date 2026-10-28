@@ -160,6 +160,11 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] Muovi i cursori: l'anteprima cambia subito. Prova i formati 16:9 e 9:16, **Random**, salva un preset e riaprilo.
 - [ ] **Export PNG** a 4K con e senza sfondo (senza = trasparente, ottimo come overlay in Premiere) ed **Export SVG** (aprilo in Illustrator).
 
+## 22. Pixel Art (giro 5)
+- [ ] Trascina una foto: l'anteprima è subito in pixel art. Muovi **Pixel size**, prova le palette (Game Boy, Pico-8…), **From the image** con pochi colori e il **dithering**.
+- [ ] Importa una palette da un link di Lospec (es. lospec.com/palette-list/sweetie-16) o incolla dei codici colore.
+- [ ] Più immagini, **Export** in Small, Original e 4K: i pixel restano nitidi; con **Grid** c'è la griglia.
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.

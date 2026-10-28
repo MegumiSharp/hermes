@@ -21,14 +21,12 @@ Aggiornato a ogni tranche. Le prove a mano sono in [TEST-TODO.md](TEST-TODO.md),
 | T20a | Image Converter: PNG/JPG/WebP/AVIF/TIFF/BMP/GIF/ICO in tutte le direzioni, ridimensionamento, immagine → SVG vettoriale | v0.6.0 |
 | T20b | Document Converter: DOCX, PDF, Markdown, LaTeX, HTML, EPUB, ODT, RTF, PPTX, XLSX in tutte le direzioni utili, PDF in immagini/testo; componenti scaricati solo con conferma; modelli e componenti eliminabili da Binaries | v0.6.0 |
 | T21 | Pattern Generator: griglia di punti a onde (idea da Durves, scritto da zero), formati 1:1/16:9/9:16/4:5, Random, preset, PNG fino a 4K con o senza sfondo, SVG | da pubblicare |
+| T22 | Pixel Art: dimensione pixel, luminosità/contrasto/saturazione, palette incluse / Lospec / incollate / dall'immagine, dithering, griglia, export piccolo o fino a 4K, più immagini insieme | da pubblicare |
 
 Provato e scartato: FLAC da SpotiFLAC (server non funzionanti), Mornye (app per telefono, estensioni di terzi).
 FLAC abbandonato per scelta (ottobre 2026).
 
 ## Da fare (in ordine)
 
-1. **T22 Pixel Art** (idea da pixelartvillage.com, scritto da zero, tutto dentro Hermes): dimensione pixel, luminosità/contrasto/
-   saturazione, palette (incluse, da Lospec, create a mano, ricavate dall'immagine 1-64 colori), dithering, griglia, export
-   piccolo e grande (fino a 4K, pixel nitidi), più immagini insieme, Eagle, tutto ricordato.
-2. **Pulizia**: Gallery che non mostra l'elenco se esci e rientri durante la lettura; test t3 (testo errore ffmpeg),
+1. **Pulizia**: Gallery che non mostra l'elenco se esci e rientri durante la lettura; test t3 (testo errore ffmpeg),
    t4 (bug del test), galleria dei test su un sito diverso da Wikimedia; verifica del secondo schermo quando è collegato.

@@ -21,6 +21,7 @@ import { renderConverter } from "./modules/converter";
 import { renderImgConv } from "./modules/imgconv";
 import { renderDocConv } from "./modules/docconv";
 import { renderPattern } from "./modules/pattern";
+import { renderPixel } from "./modules/pixel";
 import { renderAudible } from "./modules/audible";
 import { renderDemucs } from "./modules/demucs";
 import { renderWhisper } from "./modules/whisper";
@@ -106,6 +107,13 @@ const modules: Module[] = [
     info: {
       about: "Generates wavy dot patterns for backgrounds, thumbnails and overlays: grid size, dot radius, wave amplitude, waves and frequency, colours, 1:1 / 16:9 / 9:16 / 4:5. Random looks and saved presets.",
       formats: "PNG up to 4K (transparent or with a background) and SVG vector.", engine: "Built in (simplex noise on a canvas)",
+    },
+  },
+  {
+    id: "pixel", name: "Pixel Art", icon: "square", section: "tools", render: renderPixel,
+    info: {
+      about: "Turns pictures into pixel art without AI: pixel size, brightness, contrast, saturation, retro palettes (Pico-8, Game Boy, Sweetie 16, Endesga 32...), palettes from Lospec, your own colours or ones taken from the image, dithering and a grid. Same settings for many images at once.",
+      formats: "PNG, JPG, WebP, GIF, BMP, AVIF in; PNG out, small (1 px per art pixel) or enlarged with crisp pixels up to 4K.", engine: "Built in",
     },
   },
   {

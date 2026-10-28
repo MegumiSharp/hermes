@@ -280,6 +280,14 @@ hermes-data/
 - Export PNG at 1080p, 2160p or 4K long side (transparent without background) or SVG (one circle per dot) to the chosen
   folder, optional copy to Eagle. Everything remembered.
 
+## 22. Pixel Art (T22)
+
+- Idea from pixelartvillage.com, written from scratch, all in the app: pixel size 1-64, brightness / contrast / saturation,
+  palettes (Pico-8, Game Boy, Sweetie 16, Endesga 32, CGA, 1-bit; imported from a Lospec link; pasted hex codes; or 1-64
+  colours taken from the image by median cut), dithering (none, Floyd–Steinberg, ordered 4×4), grid with colour.
+- Live preview of the selected image; export every image with the same settings as PNG: small (1 px per art pixel),
+  original size or up to 2160 / 3840 px, always an integer scale so pixels stay crisp; optional copy to Eagle.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.
