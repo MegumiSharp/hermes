@@ -234,7 +234,8 @@ export function renderPixel(view: HTMLElement) {
     const box = stage.getBoundingClientRect();
     const k = Math.max(1, Math.floor(Math.min((box.width - 24) / small.width, (box.height - 24) / small.height)));
     upscale(small, k, canvas);
-    const fit = Math.min((box.width - 24) / canvas.width, (box.height - 24) / canvas.height, 1);
+    // always fill the stage: the size stays put while the pixel size changes (pixelated, so it stays crisp)
+    const fit = Math.min((box.width - 24) / canvas.width, (box.height - 24) / canvas.height);
     canvas.style.width = `${Math.floor(canvas.width * fit)}px`;
     canvas.style.height = `${Math.floor(canvas.height * fit)}px`;
     const pal = paletteOf(small.data);

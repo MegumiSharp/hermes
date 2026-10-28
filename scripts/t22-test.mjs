@@ -57,6 +57,15 @@ await drop(page, a);
 await until(async () => (await page.textContent("#px-info")).includes("80 × 45"), "preview of a 640×360 image at pixel size 8");
 check(true, `info: ${await page.textContent("#px-info")}`);
 check((await previewColours(page)).length > 8, "preview keeps the image's colours by default");
+// the preview keeps its size on screen whatever the pixel size
+const shown = () => page.$eval("#px-canvas", (c) => Math.round(c.getBoundingClientRect().width));
+const w8 = await shown(), sizes = [];
+for (const v of [3, 13, 29, 8]) {
+  await setSlider(page, '[data-key="size"]', v);
+  await until(async () => (await page.textContent("#px-info")).includes(`${Math.round(640 / v)} ×`), `preview at pixel size ${v}`);
+  sizes.push(await shown());
+}
+check(sizes.every((x) => Math.abs(x - w8) <= 2), `preview stays the same size (${w8} px; ${sizes.join(", ")})`);
 
 await page.selectOption("#px-palette", "Game Boy");
 const gb = ["0f380f", "306230", "8bac0f", "9bbc0f"];

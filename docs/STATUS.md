@@ -24,6 +24,7 @@ Aggiornato a ogni tranche. Le prove a mano sono in [TEST-TODO.md](TEST-TODO.md),
 | T22 | Pixel Art: dimensione pixel, luminosità/contrasto/saturazione, palette incluse / Lospec / incollate / dall'immagine, dithering, griglia, export piccolo o fino a 4K, più immagini insieme | v0.7.0 |
 | pulizia | Gallery: uscendo e rientrando durante la lettura l'elenco ora compare; playlist con video non disponibili ora si aggiungono (prima "Add to queue" non faceva niente); un solo avviso cookie invece di tre; errori di ffmpeg con il nome del file; test più affidabili (galleria locale) | v0.7.0 |
 | fix | Pattern Generator: onde come su Durves (ogni punto si sposta di tutta l'ampiezza, il rumore decide solo la direzione; stessa scala di Durves, quindi gli stessi numeri danno lo stesso risultato) | v0.7.1 |
+| fix | Pixel Art: l'anteprima resta della stessa grandezza qualunque sia la dimensione dei pixel | da pubblicare |
 
 Provato e scartato: FLAC da SpotiFLAC (server non funzionanti), Mornye (app per telefono, estensioni di terzi).
 FLAC abbandonato per scelta (ottobre 2026).
