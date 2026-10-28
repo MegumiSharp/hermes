@@ -125,6 +125,11 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] Passa il mouse su un pulsante con suggerimento (per esempio Clear): il riquadro è scuro come il resto dell'app.
 - [ ] Le barre di scorrimento sono sottili e scure, senza freccette. Dimmi se vedi ancora qualcosa che sembra "di Windows" o spaziature strane.
 
+## 15. Video Downloader audio (giro 4)
+- [ ] Formato **Audio only** con una canzone che ha i sottotitoli ufficiali (es. un video musicale ufficiale): sotto dice "lyrics (en)". Apri l'MP3 in un lettore che mostra i testi (foobar2000, MusicBee, l'app Musica di Windows): ci sono il testo e la copertina quadrata.
+- [ ] Spunta **WAV for editing**: il file è un WAV a 48 kHz, in coda ha la pill **WAV · Montaggio**; importalo in Premiere.
+- [ ] Chiudi e riapri Hermes: le spunte sono rimaste.
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.

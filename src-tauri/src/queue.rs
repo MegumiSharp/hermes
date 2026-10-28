@@ -85,6 +85,12 @@ pub enum Step {
         #[serde(default)]
         gentle: bool, // CPU on 2 threads: slower, PC stays smooth
     },
+    /// Official lyrics (subtitles yt-dlp saved next to the last output) into its ID3 tags (lyrics.rs).
+    /// Never fails the job: no subtitles = no lyrics.
+    Lyrics {
+        #[serde(default)]
+        prefer: Vec<String>,
+    },
     /// Download one Audible book and convert it to M4B (src-tauri/src/audible.rs).
     Audible {
         asin: String,
@@ -357,6 +363,20 @@ async fn run(id: String) {
                 let last = job.outputs.last().cloned().unwrap_or_default();
                 for p in paths.iter().map(|p| PathBuf::from(fill_placeholders(p, &last))) {
                     if p.is_dir() { std::fs::remove_dir_all(&p).ok(); } else { std::fs::remove_file(&p).ok(); }
+                }
+                Ok(vec![])
+            }
+            Step::Lyrics { prefer } => {
+                let last = job.outputs.last().cloned().unwrap_or_default();
+                tick(&id, 0.0, "Adding lyrics".into());
+                let note = match crate::lyrics::embed(&last, &prefer) {
+                    Ok(Some(lang)) => format!("Lyrics: {lang}"),
+                    Ok(None) => "No official lyrics".to_string(),
+                    Err(e) => format!("Lyrics skipped: {e}"),
+                };
+                log_line(&id, &note);
+                if let Some(j) = job_mut(&mut lock(), &id) {
+                    j.note = note;
                 }
                 Ok(vec![])
             }

@@ -301,6 +301,7 @@ input.num { width: 72px; height: 30px; padding: 0 8px; border: 1px solid var(--b
 .v-list { height: auto; padding: 8px 12px; white-space: normal; }
 .v-out { display: flex; flex-direction: column; gap: 8px; }
 .v-out .check { align-self: flex-start; }
+.v-audio { display: flex; flex-wrap: wrap; gap: 8px; }
 .mi:disabled { opacity: .4; cursor: default; }
 .mi:disabled:hover { background: none; }
 

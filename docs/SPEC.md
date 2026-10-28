@@ -241,6 +241,13 @@ hermes-data/
 - Reading a link shows live feedback (stage, n / total, elapsed, Details with the tool output). The download bar weights each
   song by stage so parallel songs move it before any finishes.
 
+## 17. Video Downloader audio (T16)
+
+- Audio only: MP3 320 kbps with tags, optional square cover (thumbnail cropped like an album cover) and optional official
+  lyrics: subtitles uploaded by the channel (never automatic captions) in the video's language, else English, written as
+  ID3 lyrics (USLT) as plain lines. Videos without them just have no lyrics (job note says so).
+- "WAV for editing": PCM 16-bit 48 kHz for Premiere, pill "WAV · Montaggio" (owner's wording); WAV can't hold cover/lyrics.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.

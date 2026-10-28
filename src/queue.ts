@@ -10,7 +10,8 @@ export type Step =
   | { type: "eagle"; keep?: boolean }
   | { type: "delete"; paths: string[] }
   | { type: "rembg"; model: string; input: string; output: string; background?: string; crop?: boolean; gentle?: boolean }
-  | { type: "audible"; asin: string; title: string; author: string; duration: number; folder: string };
+  | { type: "audible"; asin: string; title: string; author: string; duration: number; folder: string }
+  | { type: "lyrics"; prefer?: string[] };
 export type EagleMeta = { website?: string; tags?: string[]; annotation?: string };
 export type NewJob = {
   module: string; title: string; pill?: string; steps?: Step[]; eagle?: EagleMeta; children?: NewJob[];

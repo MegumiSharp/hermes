@@ -2,6 +2,7 @@ mod audible;
 mod binaries;
 mod cookies;
 mod eagle;
+mod lyrics;
 mod models;
 mod net;
 mod python;

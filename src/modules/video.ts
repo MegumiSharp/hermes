@@ -8,7 +8,7 @@ import { addJobs, mountQueue, NewJob, Step } from "../queue";
 import { eagleControls, folderField } from "./common";
 
 type Format = "best" | "2160" | "1440" | "1080" | "mp3";
-type Prefs = { format: Format; folder: string; eagle: boolean; url: string; premiere: boolean; wholeList: boolean };
+type Prefs = { format: Format; folder: string; eagle: boolean; url: string; premiere: boolean; wholeList: boolean; cover: boolean; lyrics: boolean; wav: boolean };
 
 type Fmt = { format_id?: string; ext?: string; vcodec?: string; acodec?: string; height?: number; fps?: number; tbr?: number; abr?: number; filesize?: number; filesize_approx?: number };
 /** The subset of `yt-dlp -J` output we use. */
@@ -18,6 +18,7 @@ type Info = {
   height?: number; fps?: number; vcodec?: string; acodec?: string; filesize?: number; filesize_approx?: number;
   requested_formats?: Fmt[]; formats?: Fmt[];
   entries?: Info[]; playlist_count?: number; thumbnails?: { url: string }[];
+  language?: string; subtitles?: Record<string, unknown>; // subtitles = uploaded by the channel (auto captions are separate)
 };
 
 const SITE = "youtube";
@@ -82,16 +83,20 @@ const premiereReady = (p: { v: Fmt; a?: Fmt; ext: string } | null) => !!p && p.e
 
 // ---------- job building ----------
 
-function download(url: string, p: Prefs, cookies: string[], toMkv: boolean): Step {
+function download(url: string, p: Prefs, cookies: string[], toMkv: boolean, subLangs = ""): Step {
   const args = [
     "--newline", "--progress", "--no-colors", "--encoding", "utf-8", "--no-playlist",
     "--progress-template", PROGRESS, "--print", "after_move:[file] %(filepath)s",
     "-o", `${p.folder}\\%(title).150B [%(id)s].%(ext)s`, ...cookies,
   ];
   const h = FORMATS.find((f) => f.id === p.format)?.height;
-  const fmt = p.format === "mp3"
-    ? ["-f", "ba/b", "-x", "--audio-format", "mp3", "--audio-quality", "320K", "--embed-thumbnail", "--embed-metadata"]
-    : ["-f", h ? `bv*[height<=${h}]+ba/b[height<=${h}]` : "bv*+ba/b", ...(toMkv ? ["--remux-video", "mkv"] : [])]; // mkv: the converted .mp4 never collides with its source
+  const fmt = p.format !== "mp3"
+    ? ["-f", h ? `bv*[height<=${h}]+ba/b[height<=${h}]` : "bv*+ba/b", ...(toMkv ? ["--remux-video", "mkv"] : [])] // mkv: the converted .mp4 never collides with its source
+    : p.wav
+      ? ["-f", "ba/b", "-x", "--audio-format", "wav", "--ppa", "ExtractAudio:-ar 48000"] // Premiere's native rate
+      : ["-f", "ba/b", "-x", "--audio-format", "mp3", "--audio-quality", "320K", "--embed-metadata",
+        ...(p.cover ? ["--embed-thumbnail", "--ppa", "ThumbnailsConvertor:-vf crop=ih:ih"] : []), // square, like an album cover
+        ...(subLangs ? ["--write-subs", "--sub-langs", subLangs, "--convert-subs", "srt"] : [])];
   return { type: "run", label: "Downloading", bin: "yt-dlp.exe", parser: "ytDlp", args: [...args, ...fmt, url] };
 }
 
@@ -107,22 +112,34 @@ function convert(duration: number): Step {
   };
 }
 
+/** Official lyrics = subtitles uploaded by the channel, in the video's language when it has them.
+ *  "" = none. Flat playlist entries don't list subtitles: ask for all, lyrics.rs keeps the best. */
+function lyricsLangs(v: Info, p: Prefs): string {
+  if (p.format !== "mp3" || p.wav || !p.lyrics) return "";
+  if (!v.subtitles) return "all,-live_chat";
+  const langs = Object.keys(v.subtitles).filter((l) => l !== "live_chat");
+  return (v.language && langs.find((l) => l === v.language || l.startsWith(`${v.language}-`))) || langs.find((l) => l.startsWith("en")) || langs[0] || "";
+}
+
+const pillOf = (p: Prefs) => (p.format !== "mp3" ? `${LABEL[p.format]}${p.premiere ? " · MP4" : ""}` : p.wav ? "WAV · Montaggio" : "MP3");
+
 function videoJob(v: Info, channel: string, p: Prefs, cookies: string[]): NewJob {
   const url = v.webpage_url ?? v.url ?? `https://www.youtube.com/watch?v=${v.id}`;
   const fh = FORMATS.find((f) => f.id === p.format)?.height;
   // flat playlist entries have no formats: convert unless we know it's already Premiere-ready
   const needsConvert = p.format !== "mp3" && p.premiere && !premiereReady(v.formats || v.requested_formats ? predict(v, fh) : null);
-  const steps: Step[] = [download(url, p, cookies, needsConvert)];
+  const subLangs = lyricsLangs(v, p);
+  const steps: Step[] = [download(url, p, cookies, needsConvert, subLangs)];
   if (needsConvert) steps.push(convert(v.duration ?? 0));
+  if (subLangs) steps.push({ type: "lyrics", prefer: v.language ? [v.language] : [] });
   if (p.eagle) steps.push({ type: "eagle" });
-  const pill = p.format === "mp3" ? "MP3" : `${LABEL[p.format]}${p.premiere ? " · MP4" : ""}`;
-  return { module: "video", title: v.title, pill, steps, eagle: { website: url, tags: [channel, url].filter(Boolean) } };
+  return { module: "video", pill: pillOf(p), title: v.title, steps, eagle: { website: url, tags: [channel, url].filter(Boolean) } };
 }
 
 // ---------- module ----------
 
 export function renderVideo(view: HTMLElement) {
-  const { state: prefs, save } = memory<Prefs>("video", { format: "best", folder: "", eagle: true, url: "", premiere: false, wholeList: false });
+  const { state: prefs, save } = memory<Prefs>("video", { format: "best", folder: "", eagle: true, url: "", premiere: false, wholeList: false, cover: true, lyrics: true, wav: false });
   // pre-T13 format names
   if ((prefs.format as string) === "1080p") prefs.format = "1080";
   if ((prefs.format as string) === "mp4") Object.assign(prefs, { format: "best", premiere: true });
@@ -150,6 +167,11 @@ export function renderVideo(view: HTMLElement) {
     <div class="v-out">
       <span class="sub" id="v-container"></span>
       <label class="check" id="v-premiere-box"><input type="checkbox" id="v-premiere"><span class="box">${icon("check")}</span>Convert to MP4 for Premiere<span class="s">H.264 + AAC, GPU</span></label>
+      <div class="v-audio" id="v-audio">
+        <label class="check" id="v-wav-box" title="Uncompressed WAV at 48 kHz, Premiere's native rate"><input type="checkbox" id="v-wav"><span class="box">${icon("check")}</span>WAV for editing<span class="s">48 kHz</span></label>
+        <label class="check" id="v-cover-box" title="The video thumbnail, cropped square like an album cover"><input type="checkbox" id="v-cover"><span class="box">${icon("check")}</span>Embed cover<span class="s">square</span></label>
+        <label class="check" id="v-lyrics-box" title="Subtitles the channel uploaded, when the video has them. Never automatic captions."><input type="checkbox" id="v-lyrics"><span class="box">${icon("check")}</span>Embed lyrics<span class="s">official only</span></label>
+      </div>
     </div>
     <div class="row2"><button class="btn primary" id="v-add" disabled>${icon("download")}Add to queue</button></div>
   </div>`);
@@ -186,7 +208,7 @@ export function renderVideo(view: HTMLElement) {
   const menu = page.querySelector<HTMLElement>(".menu")!;
   const maxHeight = () => (info && info._type !== "playlist" ? Math.max(0, ...(info.formats ?? []).map((f) => f.height ?? 0), info.height ?? 0) : 1e9);
   function hint(f: (typeof FORMATS)[number]): string {
-    if (f.id === "mp3") return "MP3 320 kbps";
+    if (f.id === "mp3") return prefs.wav ? "WAV 48 kHz" : "MP3 320 kbps";
     if (!info || info._type === "playlist") return f.height ? `up to ${f.height}p` : "highest available";
     if (f.height && maxHeight() < f.height) return `not available (max ${maxHeight()}p)`;
     const p = predict(info, f.height);
@@ -207,8 +229,16 @@ export function renderVideo(view: HTMLElement) {
   function renderOutput() {
     const audio = prefs.format === "mp3";
     $("#v-premiere-box").hidden = audio;
+    $("#v-audio").hidden = !audio;
+    $("#v-cover-box").hidden = $("#v-lyrics-box").hidden = prefs.wav; // WAV can't carry a cover or lyrics
     const el = $("#v-container");
-    if (audio) { el.textContent = "Saved as MP3 (320 kbps, cover and tags embedded)."; return; }
+    if (audio) {
+      if (prefs.wav) { el.textContent = "Saved as WAV (48 kHz) for editing in Premiere."; return; }
+      const subs = info && info._type !== "playlist" ? lyricsLangs(info, prefs) : "";
+      const lyr = !prefs.lyrics ? "" : info && info._type !== "playlist" ? (subs ? ` and lyrics (${subs})` : ", no official lyrics for this video") : " and lyrics where the video has them";
+      el.textContent = `Saved as MP3 320 kbps with tags${prefs.cover ? ", square cover" : ""}${lyr}.`;
+      return;
+    }
     if (!info) { el.textContent = ""; return; }
     if (info._type === "playlist") {
       el.textContent = prefs.premiere ? "Each video is saved as MP4 (H.264 + AAC)." : "Each video keeps its best container (usually MKV or WEBM).";
@@ -239,6 +269,11 @@ export function renderVideo(view: HTMLElement) {
   const premiere = $<HTMLInputElement>("#v-premiere");
   premiere.checked = prefs.premiere;
   premiere.onchange = () => { prefs.premiere = premiere.checked; save(); renderOutput(); };
+  for (const key of ["wav", "cover", "lyrics"] as const) {
+    const box = $<HTMLInputElement>(`#v-${key}`);
+    box.checked = prefs[key];
+    box.onchange = () => { prefs[key] = box.checked; save(); renderFormat(); };
+  }
 
   // ----- probe -----
   async function probe() {
@@ -318,9 +353,8 @@ export function renderVideo(view: HTMLElement) {
     if (!info) return;
     const cookies = await cookieArgs(SITE);
     const channel = info.channel ?? info.uploader ?? "";
-    const pill = prefs.format === "mp3" ? "MP3" : LABEL[prefs.format];
     const job = info._type === "playlist"
-      ? { module: "video", title: info.title, pill, children: (info.entries ?? []).map((e) => videoJob(e, e.channel ?? e.uploader ?? channel, prefs, cookies)) }
+      ? { module: "video", title: info.title, pill: pillOf(prefs).replace(" · MP4", ""), children: (info.entries ?? []).map((e) => videoJob(e, e.channel ?? e.uploader ?? channel, prefs, cookies)) }
       : videoJob(info, channel, prefs, cookies);
     if (job.children && !job.children.length) return banner({ id: "video-empty", tone: "warn", icon: "alert", text: "This playlist has no videos." });
     await addJobs([job]);
