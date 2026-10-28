@@ -27,7 +27,7 @@ Aggiornato a ogni tranche. Le prove a mano sono in [TEST-TODO.md](TEST-TODO.md),
 | fix | Pixel Art: l'anteprima resta della stessa grandezza qualunque sia la dimensione dei pixel | v0.8.0 |
 | T23 | Sfondi per ogni tool: un PNG trasparente disegnato appena visibile dietro la pagina, editor dal pulsante Backdrop (9 stili, visibilità, grandezza, dettaglio, sfocatura, posizione, colore, specchio, "applica a tutti") | v0.8.0 |
 | T24 | Anya, la compagna: faccia nel logo e nell'icona, pose per ogni tool con i colori di Hermes, wobble, schiacciata quando parla con la voce, idle che "lavora", consigli, citazioni dei videogiochi con commento suo, festa quando un lavoro finisce; impostazioni per grandezza, volume, posizione, wobble, quanto parla | v0.8.0 |
-| fix | Aggiornamenti anche quando GitHub limita le richieste (Hermes legge la pagina della release); logo e icona di Windows dal tuo disegno con i colori di Hermes; Image Upscale senza la posa scura | da pubblicare |
+| fix | Aggiornamenti anche quando GitHub limita le richieste (Hermes legge la pagina della release); logo e icona di Windows dal tuo disegno con i colori di Hermes; Image Upscale senza la posa scura | v0.8.1 |
 
 Provato e scartato: FLAC da SpotiFLAC (server non funzionanti), Mornye (app per telefono, estensioni di terzi).
 FLAC abbandonato per scelta (ottobre 2026).
