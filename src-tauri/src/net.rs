@@ -39,7 +39,7 @@ pub async fn latest_release(api: &str) -> Result<Option<Release>, String> {
         reqwest::StatusCode::NOT_FOUND => return Ok(None),
         reqwest::StatusCode::NOT_MODIFIED => cache[api].1.clone(),
         s if s == reqwest::StatusCode::FORBIDDEN || s == reqwest::StatusCode::TOO_MANY_REQUESTS => {
-            return Err("Update server rate limit reached, try again later".into());
+            return latest_from_pages(api).await;
         }
         _ => {
             let res = res.error_for_status().map_err(err)?;
@@ -59,6 +59,38 @@ pub async fn latest_release(api: &str) -> Result<Option<Release>, String> {
         date: s(&v["published_at"]),
         assets: assets.map(|a| (s(&a["name"]), s(&a["browser_download_url"]))).collect(),
     }))
+}
+
+/// GitHub's API allows 60 requests an hour per IP; the release pages don't count against it, so when the
+/// API says no, read the latest tag and its date from the release page and the assets from its list.
+async fn latest_from_pages(api: &str) -> Result<Option<Release>, String> {
+    let limited = || "Update server rate limit reached, try again later".to_string();
+    let repo = api.strip_prefix("https://api.github.com/repos/").and_then(|r| r.strip_suffix("/releases/latest")).ok_or_else(limited)?;
+    let res = client().get(format!("https://github.com/{repo}/releases/latest")).send().await.map_err(err)?;
+    if res.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(None);
+    }
+    let res = res.error_for_status().map_err(|_| limited())?;
+    // redirected to /<repo>/releases/tag/<tag>
+    let Some(tag) = res.url().path().rsplit_once("/releases/tag/").map(|(_, t)| t.to_string()) else { return Ok(None) };
+    let html = res.text().await.map_err(err)?;
+    let date = html.split("datetime=\"").nth(1).and_then(|s| s.split('"').next()).unwrap_or_default().to_string();
+    let list = client().get(format!("https://github.com/{repo}/releases/expanded_assets/{tag}")).send().await.map_err(err)?;
+    let list = list.error_for_status().map_err(|_| limited())?.text().await.map_err(err)?;
+    let prefix = format!("/{repo}/releases/download/{tag}/");
+    let mut assets: Vec<(String, String)> = vec![];
+    for href in list.split("href=\"").skip(1).filter_map(|s| s.split('"').next()) {
+        // ponytail: names are taken as written in the link (no percent-decoding); fine for these release assets
+        if let Some(name) = href.strip_prefix(&prefix) {
+            if !assets.iter().any(|(n, _)| n == name) {
+                assets.push((name.to_string(), format!("https://github.com{href}")));
+            }
+        }
+    }
+    if date.is_empty() || assets.is_empty() {
+        return Err(limited()); // page layout changed: better no answer than a wrong one
+    }
+    Ok(Some(Release { tag, date, assets }))
 }
 
 /// Streams `url` to `dest`, calling `progress(done, total)` per chunk. Fails on a short download.

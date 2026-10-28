@@ -255,7 +255,7 @@ export const IDLE: [string, string][] = [
 
 // the pose that goes with each page (front = her default)
 export const POSE: Record<string, string> = {
-  video: "34view", spotify: "support", gallery: "conference", rembg: "copymachine", upscale: "math", converter: "base",
+  video: "34view", spotify: "support", gallery: "conference", rembg: "copymachine", upscale: "base", converter: "34view",
   imgconv: "draw", docconv: "impress", pattern: "calc", pixel: "typing", demucs: "support", whisper: "writer",
   audible: "documentation", thumbs: "blank", downloads: "freelance", binaries: "back", settings: "front",
 };

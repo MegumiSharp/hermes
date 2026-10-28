@@ -65,7 +65,7 @@ check(q.quote && q.src.length > 3 && q.said.length > 5, `quote, then her comment
 await page.screenshot({ path: join(OUT, "t24-quote.png") });
 
 // poses follow the tool
-for (const [tool, p] of [["pixel", "typing"], ["docconv", "impress"], ["imgconv", "draw"], ["settings", "front"]]) {
+for (const [tool, p] of [["upscale", "base"], ["pixel", "typing"], ["docconv", "impress"], ["imgconv", "draw"], ["settings", "front"]]) {
   await page.click(`.nav[data-id="${tool}"]`);
   await until(async () => (await pose(page)) === p, `${tool} pose`);
 }
