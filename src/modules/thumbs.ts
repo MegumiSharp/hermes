@@ -7,7 +7,7 @@ import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { binariesReady } from "../binaries";
 import { clearers, h, memory } from "../core";
 import { icon, IconName } from "../icons";
-import { dropZone } from "./common";
+import { dropZone, liveStatus } from "./common";
 
 type Mine = { id: string; path: string; title: string; duration: string; on: boolean };
 type Video = { id: string; title: string; channel: string; channelUrl: string; views: number; duration: number; desc: string; thumb: string; verified: boolean };
@@ -46,6 +46,7 @@ const { state, save } = memory("thumbs", {
   gray: false, blur: false, watched: false, highlight: true,
 });
 let searching = 0;
+const live = liveStatus(); // module scope: a search started on an earlier visit reports to the open page
 
 export function renderThumbs(view: HTMLElement) {
   clearers.set("thumbs", () => { Object.assign(state, { mine: [], videos: [], order: [], topic: "" }); save(); });
@@ -68,7 +69,7 @@ export function renderThumbs(view: HTMLElement) {
           <form class="url" id="t-topic-form"><label class="field">${icon("search")}<input id="t-topic" placeholder="Your niche or a search, e.g. minecraft builds" spellcheck="false"></label>
           <button class="btn" type="submit" id="t-search">Search</button>
           <button class="btn" type="button" id="t-dice" title="Random topic">${icon("dice")}</button></form>
-          <div class="sub" id="t-status"></div></div>
+          <div id="t-status"></div></div>
       </div>
     </div>
     <div class="th-bar">
@@ -90,7 +91,7 @@ export function renderThumbs(view: HTMLElement) {
   </div>`);
   const $ = <T extends HTMLElement>(s: string) => page.querySelector<T>(s)!;
   const stage = $("#t-stage");
-  const status = $("#t-status");
+  $("#t-status").append(live.el);
 
   // ----- your thumbnails -----
   const mineEl = page.querySelector<HTMLElement>(".th-mine")!;
@@ -165,12 +166,13 @@ export function renderThumbs(view: HTMLElement) {
     btn.disabled = true;
     try {
       await binariesReady;
-      const j = await invoke<any>("tool_json", { bin: "yt-dlp.exe", args: ["-J", "--no-warnings", "--encoding", "utf-8", "--flat-playlist", "--playlist-items", "0", /^https?:/.test(u) ? u : `https://www.youtube.com/${u.startsWith("@") ? u : `@${u}`}`] });
+      live.set("Reading the channel");
+      const j = await invoke<any>("tool_json", { id: live.stream(), bin: "yt-dlp.exe", args: ["-J", "--no-warnings", "--encoding", "utf-8", "--flat-playlist", "--playlist-items", "0", /^https?:/.test(u) ? u : `https://www.youtube.com/${u.startsWith("@") ? u : `@${u}`}`] });
       const av = (j.thumbnails ?? []).find((t: any) => t.id === "avatar_uncropped")?.url ?? "";
       state.channel = { url: u, name: j.channel || j.uploader || j.title || "Your channel", avatar: av ? avatarSize(av) : "", subs: j.channel_follower_count ?? 0 };
-      status.textContent = "";
+      live.done();
     } catch (err) {
-      status.textContent = `Could not read this channel: ${err}`;
+      live.fail(`Could not read this channel: ${err}`);
     }
     btn.disabled = false;
     save(); renderChannel(); renderStage();
@@ -188,21 +190,21 @@ export function renderThumbs(view: HTMLElement) {
     const id = ++searching;
     state.topic = term;
     topic.value = term;
-    status.textContent = `Searching YouTube for "${term}"`;
+    live.set(`Searching YouTube for "${term}"`);
     $<HTMLButtonElement>("#t-search").disabled = true;
     try {
       await binariesReady;
-      const j = await invoke<any>("tool_json", { bin: "yt-dlp.exe", args: ["-J", "--no-warnings", "--encoding", "utf-8", "--flat-playlist", `ytsearch30:${term}`] });
+      const j = await invoke<any>("tool_json", { bin: "yt-dlp.exe", args: ["-J", "--no-warnings", "--encoding", "utf-8", "--flat-playlist", `ytsearch30:${term}`], id: live.stream() });
       if (id !== searching) return;
       const videos: Video[] = (j.entries ?? []).filter((e: any) => e.id && e.duration && e.thumbnails?.length).slice(0, 24).map((e: any) => ({
         id: e.id, title: e.title ?? "", channel: e.channel ?? e.uploader ?? "", channelUrl: e.channel_url ?? e.uploader_url ?? "",
         views: e.view_count ?? 0, duration: e.duration, desc: e.description ?? "", thumb: e.thumbnails.at(-1).url, verified: !!e.channel_is_verified,
       }));
       Object.assign(state, { videos, order: videos.map((_, i) => i) });
-      status.textContent = videos.length ? "" : "No videos found, try another search.";
+      if (videos.length) live.done(); else live.fail("No videos found, try another search.");
       save(); renderStage(); fetchAvatars();
     } catch (err) {
-      if (id === searching) status.textContent = `Search failed: ${err}`;
+      if (id === searching) live.fail(`Search failed: ${err}`);
     } finally {
       if (id === searching) $<HTMLButtonElement>("#t-search").disabled = false;
     }

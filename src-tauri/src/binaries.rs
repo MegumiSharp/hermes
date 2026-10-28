@@ -94,31 +94,32 @@ pub fn command(file: &str) -> tokio::process::Command {
     c
 }
 
+/// Emits each line of `r` as `tool-line` `[id, line]` (split on LF and CR) and collects it into `text`.
+async fn pump(mut r: impl tokio::io::AsyncRead + Unpin, app: AppHandle, id: String, text: std::sync::Arc<Mutex<String>>) {
+    use tokio::io::AsyncReadExt;
+    let (mut buf, mut pending) = ([0u8; 4096], Vec::new());
+    while let Ok(n) = r.read(&mut buf).await {
+        if n == 0 {
+            break;
+        }
+        pending.extend_from_slice(&buf[..n]);
+        while let Some(i) = pending.iter().position(|&b| b == b'\n' || b == b'\r') {
+            let line = String::from_utf8_lossy(&pending[..i]).trim().to_string();
+            pending.drain(..=i);
+            if !line.is_empty() {
+                app.emit("tool-line", (&id, &line)).ok();
+                let mut t = text.lock().unwrap();
+                t.push_str(&line);
+                t.push('\n');
+            }
+        }
+    }
+}
+
 /// Like `tool_text`, but every output line is also emitted live as `tool-line` `[id, line]`, so the
 /// UI can show what a slow probe is doing. Lines split on \n and \r (progress bars).
 #[tauri::command]
 pub async fn tool_stream(app: AppHandle, id: String, bin: String, args: Vec<String>) -> Result<String, String> {
-    use std::sync::Arc;
-    use tokio::io::{AsyncRead, AsyncReadExt};
-    async fn pump(mut r: impl AsyncRead + Unpin, app: AppHandle, id: String, text: Arc<Mutex<String>>) {
-        let (mut buf, mut pending) = ([0u8; 4096], Vec::new());
-        while let Ok(n) = r.read(&mut buf).await {
-            if n == 0 {
-                break;
-            }
-            pending.extend_from_slice(&buf[..n]);
-            while let Some(i) = pending.iter().position(|&b| b == b'\n' || b == b'\r') {
-                let line = String::from_utf8_lossy(&pending[..i]).trim().to_string();
-                pending.drain(..=i);
-                if !line.is_empty() {
-                    app.emit("tool-line", (&id, &line)).ok();
-                    let mut t = text.lock().unwrap();
-                    t.push_str(&line);
-                    t.push('\n');
-                }
-            }
-        }
-    }
     let mut child = command(&bin)
         .args(&args)
         .stdin(std::process::Stdio::null())
@@ -126,7 +127,7 @@ pub async fn tool_stream(app: AppHandle, id: String, bin: String, args: Vec<Stri
         .stderr(std::process::Stdio::piped())
         .spawn()
         .map_err(err)?;
-    let text = Arc::new(Mutex::new(String::new()));
+    let text = std::sync::Arc::new(Mutex::new(String::new()));
     let a = tokio::spawn(pump(child.stdout.take().unwrap(), app.clone(), id.clone(), text.clone()));
     let b = tokio::spawn(pump(child.stderr.take().unwrap(), app, id, text.clone()));
     let status = child.wait().await.map_err(err)?;
@@ -174,8 +175,34 @@ pub async fn tool_text(bin: String, args: Vec<String>) -> Result<String, String>
 /// Runs a bundled tool that prints JSON (`yt-dlp -J`, `gallery-dl -j`) and returns it parsed.
 /// On failure the error is the tool's last `ERROR:` line (or its last stderr line).
 #[tauri::command]
-pub async fn tool_json(bin: String, args: Vec<String>) -> Result<serde_json::Value, String> {
-    let out = command(&bin).args(&args).stdin(std::process::Stdio::null()).output().await.map_err(err)?;
+pub async fn tool_json(app: AppHandle, bin: String, args: Vec<String>, id: Option<String>) -> Result<serde_json::Value, String> {
+    let out = match id {
+        None => command(&bin).args(&args).stdin(std::process::Stdio::null()).output().await.map_err(err)?,
+        // `id` given: stderr (the tool's progress) streams to the UI as tool-line while stdout collects the JSON
+        Some(id) => {
+            use tokio::io::AsyncReadExt;
+            let mut child = command(&bin)
+                .args(&args)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+                .map_err(err)?;
+            let errs = std::sync::Arc::new(Mutex::new(String::new()));
+            let mut stdout = child.stdout.take().unwrap();
+            let reader = tokio::spawn(async move {
+                let mut v = Vec::new();
+                stdout.read_to_end(&mut v).await.ok();
+                v
+            });
+            let b = tokio::spawn(pump(child.stderr.take().unwrap(), app, id, errs.clone()));
+            let status = child.wait().await.map_err(err)?;
+            let stdout = reader.await.unwrap_or_default();
+            b.await.ok();
+            let stderr = errs.lock().unwrap().clone().into_bytes();
+            std::process::Output { status, stdout, stderr }
+        }
+    };
     let stderr = String::from_utf8_lossy(&out.stderr);
     if !out.status.success() {
         let lines: Vec<&str> = stderr.lines().map(str::trim).filter(|l| !l.is_empty()).collect();

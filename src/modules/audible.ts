@@ -5,7 +5,7 @@ import { binariesReady } from "../binaries";
 import { banner, clearers, h, memory } from "../core";
 import { icon } from "../icons";
 import { addJobs, mountQueue, watchJobs } from "../queue";
-import { folderField } from "./common";
+import { folderField, liveStatus } from "./common";
 
 const COUNTRIES: Record<string, string> = {
   it: "Italy", us: "United States", uk: "United Kingdom", de: "Germany", fr: "France", es: "Spain",
@@ -75,14 +75,19 @@ export function renderAudible(view: HTMLElement) {
       const b = e.currentTarget as HTMLButtonElement;
       b.disabled = true;
       errBox.textContent = "";
+      const wait = liveStatus();
+      b.after(wait.el);
+      wait.set("Preparing Amazon's sign-in page");
       try {
         const link = await invoke<string>("audible_login_start", { country: country.value });
+        wait.done();
         await openUrl(link);
         state.loginStarted = true;
         save();
         body.querySelector<HTMLElement>(".a-step2")!.hidden = false;
         url.focus();
       } catch (er) {
+        wait.done();
         errBox.textContent = String(er);
       }
       b.disabled = false;
@@ -92,14 +97,19 @@ export function renderAudible(view: HTMLElement) {
       if (!url.value.includes("amazon")) { errBox.textContent = "Paste the full address of the \"Page not found\" page."; return; }
       b.disabled = true;
       errBox.textContent = "";
+      const wait = liveStatus();
+      b.after(wait.el);
+      wait.set("Connecting your Audible account");
       try {
         await invoke("audible_login_finish", { url: url.value });
+        wait.done();
         Object.assign(state, { pendingUrl: "", loginStarted: false });
         save();
         banner({ id: "audible", icon: "check", text: "Audible account connected." });
         render();
       } catch (er) {
         // the sign-in session ended with the attempt: the user restarts from step 1
+        wait.done();
         errBox.textContent = `${er}. Click "Sign in with Amazon" to try again.`;
         state.loginStarted = false;
         save();
@@ -110,10 +120,13 @@ export function renderAudible(view: HTMLElement) {
 
   // ----- library -----
   async function renderLibrary(refresh: boolean) {
-    body.replaceChildren(h(`<div class="sub a-loading">Loading your library</div>`));
+    const wait = liveStatus();
+    body.replaceChildren(wait.el);
+    wait.set(refresh ? "Downloading your library from Audible (large libraries take a minute)" : "Loading your library");
     let books: Book[];
     try {
       const data = await invoke<Book[] | { items: Book[] }>("audible_library", { refresh });
+      wait.done();
       books = (Array.isArray(data) ? data : data.items ?? []).filter((b) => b.asin);
     } catch (e) {
       body.replaceChildren(h(`<div class="g-error">${icon("alert")}<span></span></div>`));

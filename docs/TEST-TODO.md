@@ -130,6 +130,10 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] Spunta **WAV for editing**: il file è un WAV a 48 kHz, in coda ha la pill **WAV · Montaggio**; importalo in Premiere.
 - [ ] Chiudi e riapri Hermes: le spunte sono rimaste.
 
+## 16. Feedback e ordine dei tool (giro 4)
+- [ ] Incolla un link nel Video Downloader, nella Gallery, cerca nel Thumbnail Tester, carica la libreria Audible, controlla gli aggiornamenti in Binaries: ogni volta vedi cosa sta facendo, i secondi che passano e (quando lo strumento scrive qualcosa) **Details**.
+- [ ] Settings → Tools: trascina un tool dalla maniglia ⋮⋮ (o selezionala e usa Alt+↑/↓). La sidebar cambia subito e l'ordine resta dopo il riavvio.
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.

@@ -462,7 +462,7 @@ export type LiveStatus = {
  *  Every wait the user can see gets one of these (UX rule: never look frozen). */
 export function liveStatus(): LiveStatus {
   const el = h(`<div class="live" hidden><div class="live-top"><b class="live-t"></b><span class="sub live-time"></span>
-    <button class="btn sm ghost live-more" type="button">Details</button></div>
+    <button class="btn sm ghost live-more" type="button" hidden>Details</button></div>
     <div class="bar"><i></i></div><pre class="live-log console" hidden></pre></div>`);
   const t = el.querySelector<HTMLElement>(".live-t")!;
   const time = el.querySelector<HTMLElement>(".live-time")!;
@@ -476,7 +476,7 @@ export function liveStatus(): LiveStatus {
   return {
     el,
     set(text, pct = null) {
-      if (!started || el.classList.contains("failed")) { started = Date.now(); lines.length = 0; log.textContent = ""; }
+      if (!started || el.classList.contains("failed")) { started = Date.now(); lines.length = 0; log.textContent = ""; log.hidden = more.hidden = true; more.textContent = "Details"; }
       el.hidden = false;
       el.classList.remove("failed");
       t.textContent = text;
@@ -495,6 +495,7 @@ export function liveStatus(): LiveStatus {
       id = `live-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       streams.set(id, (line) => {
         onLine?.(line);
+        more.hidden = false; // Details only once the tool has said something
         lines.push(line);
         if (lines.length > 300) lines.shift();
         log.textContent = lines.join("\n");

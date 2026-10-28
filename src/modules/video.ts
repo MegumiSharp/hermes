@@ -5,7 +5,7 @@ import { cookieArgs, cookieLabel, cookiesModal, isCookieError, markBroken } from
 import { banner, clearers, h, memory } from "../core";
 import { icon } from "../icons";
 import { addJobs, mountQueue, NewJob, Step } from "../queue";
-import { eagleControls, folderField } from "./common";
+import { eagleControls, folderField, liveStatus } from "./common";
 
 type Format = "best" | "2160" | "1440" | "1080" | "mp3";
 type Prefs = { format: Format; folder: string; eagle: boolean; url: string; premiere: boolean; wholeList: boolean; cover: boolean; lyrics: boolean; wav: boolean };
@@ -158,6 +158,7 @@ export function renderVideo(view: HTMLElement) {
       <button class="btn" id="v-fetch" type="submit">Fetch</button>
     </form>
     <label class="check v-list" id="v-list" hidden><input type="checkbox" id="v-whole"><span class="box">${icon("check")}</span><span class="v-list-t"></span></label>
+    <div id="v-live"></div>
     <div class="preview" id="v-preview" hidden></div>
     <div class="opts">
       <div class="opt"><span class="field-label">Format</span>
@@ -179,6 +180,8 @@ export function renderVideo(view: HTMLElement) {
   const urlInput = $<HTMLInputElement>("#v-url");
   const preview = $("#v-preview");
   const addBtn = $<HTMLButtonElement>("#v-add");
+  const live = liveStatus();
+  $("#v-live").append(live.el);
   $("#v-dest").append(folderField(prefs, save, "v-folder"));
   $(".row2").prepend(...eagleControls(prefs, save, "v-eagle"));
 
@@ -283,16 +286,15 @@ export function renderVideo(view: HTMLElement) {
     const id = ++probing;
     info = null;
     addBtn.disabled = true;
-    preview.hidden = false;
-    preview.className = "preview loading";
-    preview.innerHTML = `<div class="thumb"></div><div class="meta"><div class="t">Fetching info</div><div class="c">This takes a few seconds</div></div>`;
-    renderFormat();
-    await binariesReady;
+    preview.hidden = true;
     const kind = listKind(url);
     const whole = kind !== "none" && prefs.wholeList;
+    live.set(whole ? (kind === "mix" ? "Reading the Mix" : "Reading the playlist") : "Reading the video");
+    renderFormat();
+    await binariesReady;
     const scope = kind === "none" ? [] : whole ? ["--yes-playlist", ...(kind === "mix" ? ["--playlist-end", String(MIX_LIMIT)] : [])] : ["--no-playlist"];
     const run = async (cookies: string[]) =>
-      invoke<Info>("tool_json", { bin: "yt-dlp.exe", args: ["-J", "--no-warnings", "--encoding", "utf-8", "--flat-playlist", ...scope, ...cookies, url] });
+      invoke<Info>("tool_json", { id: live.stream(), bin: "yt-dlp.exe", args: ["-J", "--no-warnings", "--encoding", "utf-8", "--flat-playlist", ...scope, ...cookies, url] });
     let result: Info;
     try {
       result = await run(await cookieArgs(SITE));
@@ -302,9 +304,11 @@ export function renderVideo(view: HTMLElement) {
       markBroken(SITE);
       refreshCookieChip();
       cookiesModal(SITE, String(e)).then((changed) => { if (changed) { refreshCookieChip(); probe(); } });
+      live.set("Browser cookies unreadable: reading without them");
       try { result = await run([]); } catch (e2) { return id === probing && showProbeError(String(e2)); }
     }
     if (id !== probing) return;
+    live.done();
     info = result;
     // a format the video doesn't have falls back to the best it has
     const fh = FORMATS.find((f) => f.id === prefs.format)?.height;
@@ -315,6 +319,8 @@ export function renderVideo(view: HTMLElement) {
   }
 
   function showProbeError(msg: string) {
+    live.done();
+    preview.hidden = false;
     preview.className = "preview error";
     preview.innerHTML = `${icon("alert")}<div class="meta"><div class="t">Could not read this URL</div><div class="c"></div></div>`;
     preview.querySelector(".c")!.textContent = msg;
@@ -326,6 +332,7 @@ export function renderVideo(view: HTMLElement) {
   }
 
   function showInfo(i: Info) {
+    preview.hidden = false;
     const playlist = i._type === "playlist";
     const thumb = i.thumbnail ?? i.thumbnails?.at(-1)?.url ?? i.entries?.[0]?.thumbnails?.at(-1)?.url;
     const f = i.requested_formats ?? [];

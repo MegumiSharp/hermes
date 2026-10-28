@@ -8,7 +8,7 @@ import { SITES, siteForUrl } from "../cookies-validate";
 import { banner, clearers, h, memory, saveSettingsSoon, settings } from "../core";
 import { icon } from "../icons";
 import { addJobs, mountQueue, Step } from "../queue";
-import { eagleControls, folderField, paths } from "./common";
+import { eagleControls, folderField, liveStatus, paths } from "./common";
 
 type Kind = "image" | "video" | "gif";
 type Filters = {
@@ -111,6 +111,7 @@ export function renderGallery(view: HTMLElement) {
     </form>
     <div class="g-body">
       <div class="g-results">
+        <div id="g-live"></div>
         <div class="g-bar"><span id="g-summary" class="sub">Fetch a URL to preview its files</span>
           <div class="right"><label class="f-check g-prev"><input type="checkbox" id="g-previews">Show previews</label>
             <button class="btn sm ghost" id="g-all">Select all</button><button class="btn sm ghost" id="g-none">Select none</button></div></div>
@@ -244,6 +245,9 @@ export function renderGallery(view: HTMLElement) {
   $("#g-all").onclick = () => { items.forEach((i) => (i.off = false)); saveOff(); renderGrid(); };
   $("#g-none").onclick = () => { items.forEach((i) => (i.off = true)); saveOff(); renderGrid(); };
 
+  const live = liveStatus();
+  $("#g-live").append(live.el);
+
   // ----- probe -----
   async function probe() {
     const url = $<HTMLInputElement>("#g-url").value.trim();
@@ -251,11 +255,12 @@ export function renderGallery(view: HTMLElement) {
     const id = ++probing;
     items = [];
     renderGrid();
-    $("#g-summary").textContent = "Reading the gallery";
+    $("#g-summary").textContent = "";
     grid.classList.add("loading");
+    live.set(`Reading the gallery (up to ${prefs.filters.limit} files)`);
     await binariesReady;
     const run = (cookies: string[]) => invoke<unknown[]>("tool_json", {
-      bin: "gallery-dl.exe", args: ["--resolve-json", "--range", `1-${prefs.filters.limit}`, ...cookies, url],
+      id: live.stream(), bin: "gallery-dl.exe", args: ["--resolve-json", "--range", `1-${prefs.filters.limit}`, ...cookies, url],
     });
     // the category (= cookie site) is only known after a first read
     const known = siteForUrl(url);
@@ -266,9 +271,11 @@ export function renderGallery(view: HTMLElement) {
       if (!(known && isCookieError(String(e)))) return id === probing && fail(String(e));
       markBroken(known);
       cookiesModal(known, String(e)).then((c) => c && probe());
+      live.set("Browser cookies unreadable: reading without them");
       try { result = await run([]); } catch (e2) { return id === probing && fail(String(e2)); }
     }
     if (id !== probing) return;
+    live.done();
     grid.classList.remove("loading");
     const parsed = parse(result);
     items = parsed.items;
@@ -283,6 +290,7 @@ export function renderGallery(view: HTMLElement) {
     }
   }
   function fail(msg: string) {
+    live.done();
     grid.classList.remove("loading");
     $("#g-summary").textContent = "";
     grid.replaceChildren(h(`<div class="g-error">${icon("alert")}<span></span></div>`));

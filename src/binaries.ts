@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { startTask } from "./activity";
 import { banner, h, navigate, saveSettings, settings } from "./core";
 import { icon } from "./icons";
+import { liveStatus } from "./modules/common";
 
 type Status = { id: string; name: string; version?: string; date?: string; ok: boolean; error?: string; notify: boolean; optional: boolean };
 type Ver = { version: string; date: string };
@@ -101,6 +102,7 @@ export function renderBinaries(view: HTMLElement) {
   const el = h(`<div class="page">
     <div class="head"><div><h3>Binaries</h3><div class="sub">Bundled tools. Updates download from each project's official releases.</div></div>
       <div class="right"><button class="btn sm" id="bin-check">${icon("refresh")}Check for updates</button></div></div>
+    <div id="bin-live"></div>
     <div class="card" id="bin-list"></div>
     <div class="card"><label class="row"><div><div class="v">Update yt-dlp automatically on launch</div>
       <div class="sub">Sites change often; an outdated yt-dlp is the most common cause of failed downloads.</div></div>
@@ -110,8 +112,11 @@ export function renderBinaries(view: HTMLElement) {
   auto.checked = settings.autoUpdateYtdlp !== false;
   auto.onchange = () => saveSettings({ autoUpdateYtdlp: auto.checked });
   const check = el.querySelector<HTMLButtonElement>("#bin-check")!;
+  const live = liveStatus();
+  el.querySelector("#bin-live")!.append(live.el);
   check.onclick = async () => {
-    const errors = await checkLatest();
+    live.set("Checking each tool's latest release");
+    const errors = await checkLatest().finally(() => live.done());
     if (errors.length) banner({ id: "bin-check", tone: "warn", icon: "alert", text: `Update check failed. ${errors.join("; ")}` });
   };
 
@@ -168,10 +173,13 @@ function aiModelsCard(): HTMLElement {
     <button class="btn sm" id="ai-check">${icon("refresh")}Check models</button></div><div id="ai-rows"></div></div>`);
   const rows = card.querySelector<HTMLElement>("#ai-rows")!;
   const btn = card.querySelector<HTMLButtonElement>("#ai-check")!;
+  const live = liveStatus();
   async function check() {
     btn.disabled = true;
-    rows.replaceChildren(h(`<div class="row"><div class="sub">Checking</div></div>`));
+    live.set("Comparing your models with GitHub, Hugging Face and PyPI");
+    rows.replaceChildren(live.el);
     const list = await invoke<ModelStatus[]>("models_status");
+    live.done();
     btn.disabled = false;
     if (!list.length) { rows.replaceChildren(h(`<div class="row"><div class="sub">No AI models downloaded yet.</div></div>`)); return; }
     rows.replaceChildren(...list.map((m) => {

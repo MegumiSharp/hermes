@@ -172,9 +172,10 @@ async function renderSettings(view: HTMLElement) {
     <div class="row"><div><div class="k">Updates</div><div class="v" id="update-status">Checked automatically on launch and every 6 hours</div></div><button class="btn sm" id="check-update">${icon("refresh")}Check now</button></div></div>
   </div>`);
   const tools = h(`<div class="card" id="tool-toggles"><div class="row"><div><div class="k">Tools</div>
-    <div class="sub">Hide the tools you don't use. Hidden tools keep their settings and queue.</div></div></div></div>`);
-  for (const m of modules.filter((m) => m.section === "tools")) {
-    const row = h(`<label class="row"><div class="v"></div><input type="checkbox" class="switch" data-tool="${m.id}"></label>`);
+    <div class="sub">Drag a tool by its handle to change the sidebar order (or Alt+↑/↓). Hidden tools keep their settings and queue.</div></div></div></div>`);
+  for (const m of ordered().filter((m) => m.section === "tools")) {
+    const row = h(`<label class="row tool-row" data-order="${m.id}"><button class="grip" type="button" title="Drag to reorder">${icon("grip")}</button>
+      <div class="v"></div><input type="checkbox" class="switch" data-tool="${m.id}"></label>`);
     row.querySelector(".v")!.textContent = m.name;
     const sw = row.querySelector("input")!;
     sw.checked = !hidden().includes(m.id);
@@ -186,9 +187,11 @@ async function renderSettings(view: HTMLElement) {
       }
       saveSettings({ hiddenTools: next });
       renderSidebar();
+      refreshDots();
     };
     tools.append(row);
   }
+  sortable(tools);
   el.append(tools);
   const prefs = h(`<div class="card"><label class="row"><div><div class="v">Show system stats in AI tools</div>
     <div class="sub">CPU, RAM, GPU load, VRAM and temperature above Background Removal, Upscale, Stem Separation and Subtitles.</div></div>
@@ -227,7 +230,13 @@ async function renderSettings(view: HTMLElement) {
 }
 
 const hidden = (): string[] => settings.hiddenTools ?? [];
-const visible = () => modules.filter((m) => !hidden().includes(m.id));
+/** Registry order, then the user's own order (Settings, drag a tool); tools added later go last. */
+const ordered = () => {
+  const order: string[] = settings.toolOrder ?? [];
+  const rank = (m: Module) => (order.includes(m.id) ? order.indexOf(m.id) : order.length + modules.indexOf(m));
+  return [...modules].sort((a, b) => rank(a) - rank(b));
+};
+const visible = () => ordered().filter((m) => !hidden().includes(m.id));
 let current = "";
 
 function open(id: string) {
@@ -256,6 +265,48 @@ function open(id: string) {
 const side = document.getElementById("side")!;
 const badge = h(`<span class="nav-badge"></span>`); // running/queued count on "Downloads"
 mountBadge(badge);
+/** Pointer drag (HTML5 drag events clash with Tauri's file drop) + Alt+↑/↓ on a row's handle. */
+function sortable(list: HTMLElement) {
+  const rows = () => [...list.querySelectorAll<HTMLElement>(".tool-row")];
+  const commit = () => {
+    saveSettings({ toolOrder: rows().map((r) => r.dataset.order!) });
+    renderSidebar();
+    refreshDots();
+  };
+  list.addEventListener("click", (e) => { if ((e.target as Element).closest(".grip")) e.preventDefault(); }); // the handle is inside the label: don't toggle
+  list.addEventListener("pointerdown", (e) => {
+    const grip = (e.target as Element).closest<HTMLElement>(".grip");
+    if (!grip) return;
+    const row = grip.closest<HTMLElement>(".tool-row")!;
+    e.preventDefault();
+    row.classList.add("dragging");
+    const move = (ev: PointerEvent) => {
+      const over = rows().find((r) => r !== row && ev.clientY > r.getBoundingClientRect().top && ev.clientY < r.getBoundingClientRect().bottom);
+      if (!over) return;
+      const after = ev.clientY > over.getBoundingClientRect().top + over.offsetHeight / 2;
+      over.insertAdjacentElement(after ? "afterend" : "beforebegin", row);
+    };
+    const up = () => {
+      document.removeEventListener("pointermove", move);
+      row.classList.remove("dragging");
+      commit();
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up, { once: true });
+  });
+  list.addEventListener("keydown", (e) => {
+    const grip = (e.target as Element).closest<HTMLElement>(".grip");
+    if (!grip || !e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    e.preventDefault();
+    const row = grip.closest<HTMLElement>(".tool-row")!;
+    const sib = e.key === "ArrowUp" ? row.previousElementSibling : row.nextElementSibling;
+    if (!sib?.classList.contains("tool-row")) return;
+    sib.insertAdjacentElement(e.key === "ArrowUp" ? "beforebegin" : "afterend", row);
+    grip.focus();
+    commit();
+  });
+}
+
 function renderSidebar() {
   side.replaceChildren();
   for (const section of ["tools", "system"] as const) {
