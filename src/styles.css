@@ -604,3 +604,4 @@ input[type=color]::-webkit-color-swatch { border: 0; border-radius: 5px; }
 .yt-score { position: absolute; left: 6px; top: 6px; background: rgba(0,0,0,.8); color: #fff; font: 600 12px Roboto, sans-serif; padding: 2px 6px; border-radius: 4px; }
 .yt-score.hot { background: var(--accent); color: var(--accent-fg); }
 .yt-card.dim { opacity: .4; }
+.card .row > .right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: none; } /* action buttons at the end of a card row */

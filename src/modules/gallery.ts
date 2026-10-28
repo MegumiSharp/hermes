@@ -245,7 +245,7 @@ export function renderGallery(view: HTMLElement) {
   $("#g-all").onclick = () => { items.forEach((i) => (i.off = false)); saveOff(); renderGrid(); };
   $("#g-none").onclick = () => { items.forEach((i) => (i.off = true)); saveOff(); renderGrid(); };
 
-  const live = liveStatus();
+  const live = liveStatus("gallery-read");
   $("#g-live").append(live.el);
 
   // ----- probe -----

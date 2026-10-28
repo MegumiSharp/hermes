@@ -27,7 +27,7 @@ const cut = (s: string) => (s.length > 70 ? `${s.slice(0, 70)}…` : s);
 
 // module scope: a check started on an earlier visit keeps reporting to the page that is open now
 const { state, save } = memory("spotify", { url: "", folder: "", format: "opus" as Format, songs: [] as Song[], listFile: "", checked: false });
-const live = liveStatus();
+const live = liveStatus("spotify-read");
 let probing = 0;
 let resumed = false; // a check interrupted by closing the app restarts once
 let draw = () => {};

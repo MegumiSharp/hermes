@@ -63,7 +63,7 @@ const { state, save } = memory("thumbs", {
   gray: false, blur: false, watched: false, highlight: true,
 });
 let searching = 0;
-const live = liveStatus(); // module scope: a search started on an earlier visit reports to the open page
+const live = liveStatus("thumbs"); // module scope: a search started on an earlier visit reports to the open page
 
 export function renderThumbs(view: HTMLElement) {
   clearers.set("thumbs", () => { Object.assign(state, { mine: [], videos: [], order: [], topic: "" }); save(); });

@@ -10,6 +10,7 @@ mod queue;
 mod rembg;
 mod stats;
 mod update;
+mod usage;
 
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
@@ -49,6 +50,14 @@ static SETTINGS: LazyLock<Mutex<Value>> =
 /// One settings.json value, as last saved by the frontend (Null when unset).
 pub fn setting(key: &str) -> Value {
     SETTINGS.lock().unwrap()[key].clone()
+}
+
+static STARTED: LazyLock<std::time::Instant> = LazyLock::new(std::time::Instant::now);
+
+/// Milliseconds since the process started (usage statistics: real startup time, not just the page's).
+#[tauri::command]
+fn startup_ms() -> u64 {
+    STARTED.elapsed().as_millis() as u64
 }
 
 #[tauri::command]
@@ -151,6 +160,7 @@ fn urlencoding_decode(s: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    LazyLock::force(&STARTED);
     update::cleanup_old_exe();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -173,6 +183,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             data_path,
+            startup_ms,
             load_settings,
             save_settings,
             update::check_update,
@@ -213,6 +224,10 @@ pub fn run() {
             rembg::rembg_compare,
             rembg::thumbnail,
             models::models_status,
+            usage::usage_log,
+            usage::usage_read,
+            usage::usage_clear,
+            usage::usage_export,
             models::model_update,
             module_paths,
             write_job_file,

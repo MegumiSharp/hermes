@@ -180,7 +180,7 @@ export function renderVideo(view: HTMLElement) {
   const urlInput = $<HTMLInputElement>("#v-url");
   const preview = $("#v-preview");
   const addBtn = $<HTMLButtonElement>("#v-add");
-  const live = liveStatus();
+  const live = liveStatus("video-read");
   $("#v-live").append(live.el);
   $("#v-dest").append(folderField(prefs, save, "v-folder"));
   $(".row2").prepend(...eagleControls(prefs, save, "v-eagle"));

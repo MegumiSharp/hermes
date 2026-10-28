@@ -7,6 +7,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { banner, h, modal, settings } from "../core";
 import { icon, IconName } from "../icons";
 import { Job, queueAction, showError, watchJobs } from "../queue";
+import { scrub, track } from "../usage";
 
 export type Paths = { data: string; bin: string; results: string; python: string };
 export const paths: Promise<Paths> = invoke("module_paths");
@@ -459,8 +460,9 @@ export type LiveStatus = {
 };
 
 /** Spinner-like bar + what is happening + elapsed seconds; Details shows the tool's own output.
- *  Every wait the user can see gets one of these (UX rule: never look frozen). */
-export function liveStatus(): LiveStatus {
+ *  Every wait the user can see gets one of these (UX rule: never look frozen). `kind` names the wait
+ *  in the usage statistics (how long it took, whether it worked). */
+export function liveStatus(kind = ""): LiveStatus {
   const el = h(`<div class="live" hidden><div class="live-top"><b class="live-t"></b><span class="sub live-time"></span>
     <button class="btn sm ghost live-more" type="button" hidden>Details</button></div>
     <div class="bar"><i></i></div><pre class="live-log console" hidden></pre></div>`);
@@ -503,9 +505,15 @@ export function liveStatus(): LiveStatus {
       });
       return id;
     },
-    done() { stop(); started = 0; el.hidden = true; },
+    done() {
+      stop();
+      if (kind && started) track("wait", { kind, ms: Date.now() - started, ok: true });
+      started = 0;
+      el.hidden = true;
+    },
     fail(msg) {
       stop();
+      if (kind && started) track("wait", { kind, ms: Date.now() - started, ok: false, error: scrub(msg) });
       el.hidden = false;
       el.classList.add("failed");
       t.textContent = msg;

@@ -141,6 +141,10 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] Scrivi il titolo della tua thumbnail e premi **Find similar**: cerca i video con cui competi.
 - [ ] Chiudi e riapri: stessa ricerca, stesse scelte rapide.
 
+## 18. Statistiche d'uso (giro 4)
+- [ ] Usa Hermes normalmente per qualche giorno. Poi Settings → **Usage statistics** → **Export…** e mandami il file: dentro ci sono tempi di avvio, durata di lavori e attese, errori, senza nomi di file, link o titoli.
+- [ ] Se non vuoi che registri, spegni l'interruttore; **Clear** cancella tutto.
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.

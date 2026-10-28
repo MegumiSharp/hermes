@@ -248,6 +248,14 @@ hermes-data/
   ID3 lyrics (USLT) as plain lines. Videos without them just have no lyrics (job note says so).
 - "WAV for editing": PCM 16-bit 48 kHz for Premiere, pill "WAV · Montaggio" (owner's wording); WAV can't hold cover/lyrics.
 
+## 18. Usage statistics (T19)
+
+- Local only (`hermes-data/usage.jsonl`), on by default, Settings switch to stop. Records launches + startup time, tool opens,
+  every finished job (tool, step tools, format pill, duration, result, error with paths/URLs/quoted names removed) and every
+  visible wait (kind, duration, result). Never file names, links, titles or typed text.
+- Settings > Usage statistics: count since date, Export… (save dialog: system snapshot, summary per tool and wait with
+  median/p90 and top errors, raw events) and Clear.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.

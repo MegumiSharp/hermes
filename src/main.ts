@@ -6,9 +6,10 @@ import { getVersion } from "@tauri-apps/api/app";
 import { availableMonitors, getCurrentWindow, PhysicalPosition, PhysicalSize } from "@tauri-apps/api/window";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { icon, IconName } from "./icons";
-import { clearers, flushSettings, h, modal, settings, saveSettings, saveSettingsSoon } from "./core";
+import { banner, clearers, flushSettings, h, modal, settings, saveSettings, saveSettingsSoon } from "./core";
 import { mountBadge, mountTasks, mountToolDots } from "./activity";
 import { mountQueue, setModuleNames } from "./queue";
+import { exportUsage, startUsageTracking, track } from "./usage";
 import { checkForUpdate, startUpdateChecks } from "./update";
 import { renderBinaries, startBinaryChecks } from "./binaries";
 import { renderVideo } from "./modules/video";
@@ -193,6 +194,7 @@ async function renderSettings(view: HTMLElement) {
   }
   sortable(tools);
   el.append(tools);
+  el.append(usageCard(version));
   const prefs = h(`<div class="card"><label class="row"><div><div class="v">Show system stats in AI tools</div>
     <div class="sub">CPU, RAM, GPU load, VRAM and temperature above Background Removal, Upscale, Stem Separation and Subtitles.</div></div>
     <input type="checkbox" class="switch" id="show-stats"></label></div>`);
@@ -258,6 +260,7 @@ function open(id: string) {
     attach();
   }
   if (settings.lastModule !== mod.id) saveSettings({ lastModule: mod.id });
+  track("open", { tool: mod.id });
   refreshDots?.(); // opening a tool marks its finished/failed work as seen
 }
 
@@ -265,6 +268,32 @@ function open(id: string) {
 const side = document.getElementById("side")!;
 const badge = h(`<span class="nav-badge"></span>`); // running/queued count on "Downloads"
 mountBadge(badge);
+/** Settings > Usage statistics: local only, exported to a file the owner can pass on. */
+function usageCard(version: string): HTMLElement {
+  const card = h(`<div class="card" id="usage-card">
+    <label class="row"><div><div class="v">Collect usage statistics</div>
+      <div class="sub">Which tools you use, how long jobs and waits take, errors and startup time, to make Hermes faster. Stays in hermes-data on this PC; nothing is sent. Never file names, links or titles.</div></div>
+      <input type="checkbox" class="switch" id="usage-on"></label>
+    <div class="row"><div><div class="k">Recorded</div><div class="v" id="usage-count">…</div></div>
+      <div class="right"><button class="btn sm" id="usage-export">${icon("download")}Export…</button><button class="btn sm ghost" id="usage-clear">${icon("trash")}Clear</button></div></div>
+  </div>`);
+  const count = card.querySelector<HTMLElement>("#usage-count")!;
+  const refresh = async () => {
+    const ev = await invoke<{ t: number }[]>("usage_read");
+    count.textContent = ev.length ? `${ev.length} events since ${new Date(ev[0].t).toLocaleDateString()}` : "Nothing yet";
+  };
+  const on = card.querySelector<HTMLInputElement>("#usage-on")!;
+  on.checked = settings.usageStats !== false;
+  on.onchange = () => saveSettings({ usageStats: on.checked });
+  card.querySelector<HTMLButtonElement>("#usage-export")!.onclick = async () => {
+    const path = await exportUsage(version);
+    if (path) banner({ id: "usage", icon: "check", text: "Usage statistics exported. Send the file to whoever is optimizing Hermes." });
+  };
+  card.querySelector<HTMLButtonElement>("#usage-clear")!.onclick = async () => { await invoke("usage_clear"); refresh(); };
+  refresh();
+  return card;
+}
+
 /** Pointer drag (HTML5 drag events clash with Tauri's file drop) + Alt+↑/↓ on a row's handle. */
 function sortable(list: HTMLElement) {
   const rows = () => [...list.querySelectorAll<HTMLElement>(".tool-row")];
@@ -362,6 +391,8 @@ async function rememberWindow() {
   saveSettingsSoon({ window: { x: pos.x, y: pos.y, width: size.width, height: size.height, maximized: false } });
 }
 await restoreWindow();
+track("launch", { version: await getVersion(), startupMs: await invoke<number>("startup_ms"), pageMs: Math.round(performance.now()) }); // exe start → window shown
+startUsageTracking();
 win.onResized(rememberWindow);
 win.onMoved(rememberWindow);
 

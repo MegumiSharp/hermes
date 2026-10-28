@@ -112,7 +112,7 @@ export function renderBinaries(view: HTMLElement) {
   auto.checked = settings.autoUpdateYtdlp !== false;
   auto.onchange = () => saveSettings({ autoUpdateYtdlp: auto.checked });
   const check = el.querySelector<HTMLButtonElement>("#bin-check")!;
-  const live = liveStatus();
+  const live = liveStatus("binaries-check");
   el.querySelector("#bin-live")!.append(live.el);
   check.onclick = async () => {
     live.set("Checking each tool's latest release");
@@ -173,7 +173,7 @@ function aiModelsCard(): HTMLElement {
     <button class="btn sm" id="ai-check">${icon("refresh")}Check models</button></div><div id="ai-rows"></div></div>`);
   const rows = card.querySelector<HTMLElement>("#ai-rows")!;
   const btn = card.querySelector<HTMLButtonElement>("#ai-check")!;
-  const live = liveStatus();
+  const live = liveStatus("models-check");
   async function check() {
     btn.disabled = true;
     live.set("Comparing your models with GitHub, Hugging Face and PyPI");

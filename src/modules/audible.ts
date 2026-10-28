@@ -75,7 +75,7 @@ export function renderAudible(view: HTMLElement) {
       const b = e.currentTarget as HTMLButtonElement;
       b.disabled = true;
       errBox.textContent = "";
-      const wait = liveStatus();
+      const wait = liveStatus("audible-signin");
       b.after(wait.el);
       wait.set("Preparing Amazon's sign-in page");
       try {
@@ -97,7 +97,7 @@ export function renderAudible(view: HTMLElement) {
       if (!url.value.includes("amazon")) { errBox.textContent = "Paste the full address of the \"Page not found\" page."; return; }
       b.disabled = true;
       errBox.textContent = "";
-      const wait = liveStatus();
+      const wait = liveStatus("audible-connect");
       b.after(wait.el);
       wait.set("Connecting your Audible account");
       try {
@@ -120,7 +120,7 @@ export function renderAudible(view: HTMLElement) {
 
   // ----- library -----
   async function renderLibrary(refresh: boolean) {
-    const wait = liveStatus();
+    const wait = liveStatus("audible-library");
     body.replaceChildren(wait.el);
     wait.set(refresh ? "Downloading your library from Audible (large libraries take a minute)" : "Loading your library");
     let books: Book[];
