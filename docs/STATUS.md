@@ -29,5 +29,8 @@ FLAC abbandonato per scelta (ottobre 2026).
 1. **T21 Pattern Generator** (idea da durves.com, scritto da zero): griglia di punti deformata a onde con matrice,
    dimensione, raggio, ampiezza, onde, frequenza, colori; formati 1:1 / 16:9 / 9:16 / 4:5; sfondo trasparente o colore;
    dado per motivi casuali e preset; export PNG fino a 4K e SVG vettoriale, invio a Eagle; tutto ricordato alla chiusura.
-2. **Pulizia**: Gallery che non mostra l'elenco se esci e rientri durante la lettura; test t3 (testo errore ffmpeg),
+2. **T22 Pixel Art** (idea da pixelartvillage.com, scritto da zero, tutto dentro Hermes): dimensione pixel, luminosità/contrasto/
+   saturazione, palette (incluse, da Lospec, create a mano, ricavate dall'immagine 1-64 colori), dithering, griglia, export
+   piccolo e grande (fino a 4K, pixel nitidi), più immagini insieme, Eagle, tutto ricordato.
+3. **Pulizia**: Gallery che non mostra l'elenco se esci e rientri durante la lettura; test t3 (testo errore ffmpeg),
    t4 (bug del test), galleria dei test su un sito diverso da Wikimedia; verifica del secondo schermo quando è collegato.
