@@ -8,6 +8,11 @@ import { binariesReady } from "../binaries";
 import { clearers, h, memory } from "../core";
 import { icon, IconName } from "../icons";
 import { dropZone, liveStatus } from "./common";
+import { listen } from "@tauri-apps/api/event";
+
+/** Lines a tool_stream call with id `sid` prints (background work with no visible status). */
+const listenLines = (sid: string, on: (l: string) => void) =>
+  listen<[string, string]>("tool-line", ({ payload: [id, l] }) => { if (id === sid) on(l); });
 
 type Mine = { id: string; path: string; title: string; duration: string; on: boolean };
 type Video = { id: string; title: string; channel: string; channelUrl: string; views: number; duration: number; desc: string; thumb: string; verified: boolean };
@@ -28,20 +33,32 @@ const clock = (s: number) => {
   return `${hh ? `${hh}:${String(mm).padStart(2, "0")}` : mm}:${String(ss).padStart(2, "0")}`;
 };
 const hash = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
-// flat search results carry no upload date: a stable, plausible age per video
+// flat search results carry no upload date: a stable, plausible age until the real one arrives (fetchDates)
 const AGES = ["2 hours ago", "9 hours ago", "1 day ago", "3 days ago", "5 days ago", "1 week ago", "2 weeks ago", "3 weeks ago", "1 month ago", "2 months ago", "5 months ago", "1 year ago"];
 const ageOf = (id: string) => AGES[hash(id) % AGES.length];
+const since = (ms: number) => {
+  const d = (Date.now() - ms) / 1000;
+  const [n, unit] = d < 3600 ? [d / 60, "minute"] : d < 86400 ? [d / 3600, "hour"] : d < 7 * 86400 ? [d / 86400, "day"]
+    : d < 30 * 86400 ? [d / (7 * 86400), "week"] : d < 365 * 86400 ? [d / (30 * 86400), "month"] : [d / (365 * 86400), "year"];
+  const k = Math.max(1, Math.floor(n as number));
+  return `${k} ${unit}${k > 1 ? "s" : ""} ago`;
+};
+const OUTLIER = 3; // views at least 3x the channel's subscribers
+type Channel = { url: string; name: string; avatar: string; subs: number };
 const avatarSize = (url: string) => url.replace(/=s\d+[^/]*$/, "=s88-c-k-c0x00ffffff-no-rj");
 const BLANK = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; // transparent pixel
 const shuffled = <T,>(a: T[]) => a.map((v) => [Math.random(), v] as const).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
 
 let avatarQueue = Promise.resolve(); // channel pages are fetched one at a time, in the background
+let datesQueue = Promise.resolve();
+const remember = <T,>(list: T[], item: T, same: (a: T) => boolean, max: number) => [item, ...list.filter((x) => !same(x))].slice(0, max);
 
 // module scope: async work (avatar queue, searches) must keep saving the same object across visits
 const { state, save } = memory("thumbs", {
   mine: [] as Mine[], topic: "", videos: [] as Video[], order: [] as number[], slots: [1, 6, 10, 15] as number[],
   channel: { url: "", name: "Your channel", avatar: "", subs: 0 }, views: "12K", age: "1 day ago", desc: "",
-  avatars: {} as Record<string, string>,
+  avatars: {} as Record<string, string>, subs: {} as Record<string, number>, dates: {} as Record<string, number>,
+  recentChannels: [] as Channel[], recentTopics: [] as string[], outliers: false,
   viewMode: "youtube" as "youtube" | "size", device: "home" as Device, dark: true,
   gray: false, blur: false, watched: false, highlight: true,
 });
@@ -59,7 +76,8 @@ export function renderThumbs(view: HTMLElement) {
         <div><span class="field-label">Your channel</span>
           <form class="url" id="t-ch-form"><label class="field">${icon("link")}<input id="t-ch" placeholder="Channel link, e.g. youtube.com/@name" spellcheck="false"></label>
           <button class="btn" type="submit" id="t-ch-fetch">Fetch</button></form>
-          <div class="th-ch" id="t-ch-card"><img alt=""><div><b></b><div class="sub"></div></div></div></div>
+          <div class="th-ch" id="t-ch-card"><img alt=""><div><b></b><div class="sub"></div></div></div>
+          <div class="th-recent" id="t-ch-recent"></div></div>
         <div class="opts three">
           <div class="opt"><span class="field-label">Views</span><label class="field"><input id="t-views" placeholder="12K"></label></div>
           <div class="opt"><span class="field-label">Uploaded</span><label class="field"><input id="t-age" placeholder="1 day ago"></label></div>
@@ -67,8 +85,10 @@ export function renderThumbs(view: HTMLElement) {
         </div>
         <div><span class="field-label">Videos around yours</span>
           <form class="url" id="t-topic-form"><label class="field">${icon("search")}<input id="t-topic" placeholder="Your niche or a search, e.g. minecraft builds" spellcheck="false"></label>
-          <button class="btn" type="submit" id="t-search">Search</button>
+          <button class="btn" type="submit" id="t-search" title="Search YouTube (Enter)" aria-label="Search">${icon("search")}</button>
+          <button class="btn" type="button" id="t-similar" title="Search YouTube with your thumbnail's title: the videos yours competes with">${icon("copy")}Find similar</button>
           <button class="btn" type="button" id="t-dice" title="Random topic">${icon("dice")}</button></form>
+          <div class="th-recent" id="t-topic-recent"></div>
           <div id="t-status"></div></div>
       </div>
     </div>
@@ -81,6 +101,7 @@ export function renderThumbs(view: HTMLElement) {
         <button data-check="gray" title="Grayscale: does it still read without color?">B/W</button>
         <button data-check="blur" title="Squint test: is it readable at a glance?">Squint</button>
         <button data-check="watched" title="Red 'watched' bar over other videos">Watched</button>
+        <button data-check="outliers" title="Views divided by the channel's subscribers. x3 or more = a video doing far better than its channel">Outliers</button>
       </div>
       <div class="right">
         <button class="btn sm" id="t-shuffle" title="Shuffle positions">${icon("shuffle")}Shuffle</button>
@@ -100,7 +121,12 @@ export function renderThumbs(view: HTMLElement) {
     state.mine.push(...paths.map((path) => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, path, title: base, duration: "12:34", on: true })));
     save(); renderMine(); renderStage();
   });
+  function renderSimilar() {
+    const b = page.querySelector<HTMLButtonElement>("#t-similar");
+    if (b) b.disabled = !state.mine.some((m) => m.on && m.title.trim());
+  }
   function renderMine() {
+    renderSimilar();
     mineEl.replaceChildren(...state.mine.map((m, i) => {
       const len = m.title.length;
       const r = h(`<div class="th-item ${m.on ? "" : "off"}" data-mine="${m.id}">
@@ -137,6 +163,7 @@ export function renderThumbs(view: HTMLElement) {
       len.classList.toggle("warn", m.title.length > CUT_TITLE);
     }
     renderStage();
+    renderSimilar();
   });
   mineEl.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-toggle], [data-remove]");
@@ -170,13 +197,31 @@ export function renderThumbs(view: HTMLElement) {
       const j = await invoke<any>("tool_json", { id: live.stream(), bin: "yt-dlp.exe", args: ["-J", "--no-warnings", "--encoding", "utf-8", "--flat-playlist", "--playlist-items", "0", /^https?:/.test(u) ? u : `https://www.youtube.com/${u.startsWith("@") ? u : `@${u}`}`] });
       const av = (j.thumbnails ?? []).find((t: any) => t.id === "avatar_uncropped")?.url ?? "";
       state.channel = { url: u, name: j.channel || j.uploader || j.title || "Your channel", avatar: av ? avatarSize(av) : "", subs: j.channel_follower_count ?? 0 };
+      state.recentChannels = remember(state.recentChannels, { ...state.channel }, (x) => x.url === u, 6);
       live.done();
     } catch (err) {
       live.fail(`Could not read this channel: ${err}`);
     }
     btn.disabled = false;
-    save(); renderChannel(); renderStage();
+    save(); renderChannel(); renderRecent(); renderStage();
   };
+  /** Last channels and searches as one-click picks: they change rarely. */
+  function renderRecent() {
+    $("#t-ch-recent").replaceChildren(...state.recentChannels.filter((c) => c.url !== state.channel.url).map((c) => {
+      const b = h(`<button class="chip chip-btn" type="button"><img alt=""><span></span></button>`);
+      b.querySelector("img")!.src = c.avatar || BLANK;
+      b.querySelector("span")!.textContent = c.name;
+      b.title = `Use ${c.name}`;
+      b.onclick = () => { state.channel = { ...c }; ch.value = c.url; save(); renderChannel(); renderRecent(); renderStage(); };
+      return b;
+    }));
+    $("#t-topic-recent").replaceChildren(...state.recentTopics.filter((t) => t !== state.topic).map((t) => {
+      const b = h(`<button class="chip chip-btn" type="button">${icon("search")}<span></span></button>`);
+      b.querySelector("span")!.textContent = t;
+      b.onclick = () => search(t, true);
+      return b;
+    }));
+  }
 
   for (const [id, key] of [["#t-views", "views"], ["#t-age", "age"], ["#t-desc", "desc"]] as const) {
     const inp = $<HTMLInputElement>(id);
@@ -186,9 +231,11 @@ export function renderThumbs(view: HTMLElement) {
 
   // ----- videos around yours -----
   const topic = $<HTMLInputElement>("#t-topic");
-  async function search(term: string) {
+  async function search(term: string, typed = false) {
     const id = ++searching;
     state.topic = term;
+    if (typed) state.recentTopics = remember(state.recentTopics, term, (x) => x === term, 8);
+    renderRecent();
     topic.value = term;
     live.set(`Searching YouTube for "${term}"`);
     $<HTMLButtonElement>("#t-search").disabled = true;
@@ -202,7 +249,7 @@ export function renderThumbs(view: HTMLElement) {
       }));
       Object.assign(state, { videos, order: videos.map((_, i) => i) });
       if (videos.length) live.done(); else live.fail("No videos found, try another search.");
-      save(); renderStage(); fetchAvatars();
+      save(); renderStage(); fetchAvatars(); fetchDates();
     } catch (err) {
       if (id === searching) live.fail(`Search failed: ${err}`);
     } finally {
@@ -210,7 +257,11 @@ export function renderThumbs(view: HTMLElement) {
     }
   }
   const randomTopic = () => search(shuffled(TOPICS.filter((t) => t !== state.topic))[0]);
-  $<HTMLFormElement>("#t-topic-form").onsubmit = (e) => { e.preventDefault(); if (topic.value.trim()) search(topic.value.trim()); else randomTopic(); };
+  $<HTMLFormElement>("#t-topic-form").onsubmit = (e) => { e.preventDefault(); if (topic.value.trim()) search(topic.value.trim(), true); else randomTopic(); };
+  $("#t-similar").onclick = () => {
+    const title = state.mine.find((m) => m.on && m.title.trim())?.title.trim();
+    if (title) search(title, true);
+  };
   $("#t-dice").onclick = randomTopic;
 
   /** Real channel avatars for the feed, fetched progressively and remembered. */
@@ -223,9 +274,36 @@ export function renderThumbs(view: HTMLElement) {
           const j = await invoke<any>("tool_json", { bin: "yt-dlp.exe", args: ["-J", "--no-warnings", "--flat-playlist", "--playlist-items", "0", u] });
           const av = (j.thumbnails ?? []).find((t: any) => t.id === "avatar_uncropped")?.url;
           state.avatars[u] = av ? avatarSize(av) : "";
+          if (j.channel_follower_count) state.subs[u] = j.channel_follower_count;
         } catch { state.avatars[u] = ""; }
         save(true);
+        if (state.outliers) renderStage();
         document.querySelectorAll<HTMLImageElement>(`.yt-av[data-ch="${CSS.escape(u)}"]`).forEach((img) => { if (state.avatars[u]) img.src = state.avatars[u]; });
+      });
+    }
+  }
+
+  /** Real upload dates, 10 videos per yt-dlp call, in the background; remembered per video. */
+  function fetchDates() {
+    const missing = state.videos.map((v) => v.id).filter((id) => !(id in state.dates));
+    for (let i = 0; i < missing.length; i += 10) {
+      const ids = missing.slice(i, i + 10);
+      datesQueue = datesQueue.then(async () => {
+        if (!ids.some((x) => state.videos.some((v) => v.id === x))) return; // that feed was replaced meanwhile
+        const lines: string[] = [];
+        const sid = `dates-${ids[0]}`;
+        const off = await listenLines(sid, (l) => lines.push(l));
+        await invoke("tool_stream", { id: sid, bin: "yt-dlp.exe", args: ["--skip-download", "--no-warnings", "--ignore-errors", "--print", "%(id)s\t%(timestamp)s\t%(upload_date)s",
+          ...ids.map((x) => `https://www.youtube.com/watch?v=${x}`)] }).catch(() => {});
+        off();
+        for (const l of lines) {
+          const [vid, ts, day] = l.split("\t");
+          if (!ids.includes(vid)) continue;
+          state.dates[vid] = Number(ts) > 0 ? Number(ts) * 1000 : /^\d{8}$/.test(day ?? "") ? Date.UTC(+day.slice(0, 4), +day.slice(4, 6) - 1, +day.slice(6, 8)) : 0;
+        }
+        for (const x of ids) state.dates[x] ??= 0; // unavailable: keep the estimate, don't ask again
+        save(true);
+        renderStage();
       });
     }
   }
@@ -253,13 +331,14 @@ export function renderThumbs(view: HTMLElement) {
   });
 
   // ----- the feed -----
-  type Card = { mine: boolean; thumb: string; title: string; channel: string; chUrl: string; avatar: string; meta: string; views: string; age: string; dur: string; desc: string; verified: boolean; watched: number };
+  type Card = { mine: boolean; thumb: string; title: string; channel: string; chUrl: string; avatar: string; meta: string; views: string; age: string; dur: string; desc: string; verified: boolean; watched: number; score?: number };
   function cards(): Card[] {
     const c = state.channel;
     const others: Card[] = state.order.map((i) => state.videos[i]).filter(Boolean).map((v) => ({
       mine: false, thumb: v.thumb, title: v.title, channel: v.channel, chUrl: v.channelUrl, avatar: state.avatars[v.channelUrl] ?? "",
-      meta: "", views: `${compact(v.views)} views`, age: ageOf(v.id), dur: clock(v.duration), desc: v.desc, verified: v.verified,
+      meta: "", views: `${compact(v.views)} views`, age: state.dates[v.id] ? since(state.dates[v.id]) : ageOf(v.id), dur: clock(v.duration), desc: v.desc, verified: v.verified,
       watched: state.watched && hash(v.id) % 4 === 0 ? 20 + (hash(v.id) % 70) : 0,
+      score: state.subs[v.channelUrl] ? v.views / state.subs[v.channelUrl] : undefined,
     }));
     const mine: Card[] = state.mine.filter((m) => m.on).map((m) => ({
       mine: true, thumb: convertFileSrc(m.path), title: m.title || "Your video title", channel: c.name, chUrl: "", avatar: c.avatar,
@@ -270,8 +349,10 @@ export function renderThumbs(view: HTMLElement) {
     return out;
   }
   function cardEl(c: Card, kind: Device): HTMLElement {
-    const el = h(`<div class="yt-card ${c.mine ? "mine" : ""}">
-      <div class="yt-thumb"><img alt="" loading="lazy" referrerpolicy="no-referrer"><span class="yt-dur"></span>${c.watched ? `<i class="yt-watched" style="width:${c.watched}%"></i>` : ""}</div>
+    const scored = state.outliers && !c.mine && c.score !== undefined;
+    const hot = scored && c.score! >= OUTLIER;
+    const el = h(`<div class="yt-card ${c.mine ? "mine" : ""} ${state.outliers && !c.mine && !hot ? "dim" : ""}">
+      <div class="yt-thumb"><img alt="" loading="lazy" referrerpolicy="no-referrer"><span class="yt-dur"></span>${scored ? `<span class="yt-score ${hot ? "hot" : ""}">×${c.score! >= 10 ? Math.round(c.score!) : c.score!.toFixed(1)}</span>` : ""}${c.watched ? `<i class="yt-watched" style="width:${c.watched}%"></i>` : ""}</div>
       <div class="yt-info">${kind === "search" ? "" : `<img class="yt-av" alt="" referrerpolicy="no-referrer">`}
         <div class="yt-text"><div class="yt-title"></div>
           ${kind === "search" ? `<div class="yt-meta"></div><div class="yt-chrow"><img class="yt-av" alt="" referrerpolicy="no-referrer"><span class="yt-ch"></span></div><div class="yt-desc"></div>`
@@ -330,8 +411,9 @@ export function renderThumbs(view: HTMLElement) {
 
   ch.value = state.channel.url;
   topic.value = state.topic;
-  renderMine(); renderChannel(); renderBar(); renderStage();
+  renderMine(); renderChannel(); renderRecent(); renderBar(); renderStage();
   view.append(page);
-  if (!state.videos.length) randomTopic(); // example videos right away
-  else fetchAvatars();
+  // example videos right away: your last search, or a random topic the first time
+  if (!state.videos.length) { if (state.topic) search(state.topic); else randomTopic(); }
+  else { fetchAvatars(); fetchDates(); }
 }

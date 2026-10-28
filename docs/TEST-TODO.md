@@ -134,6 +134,13 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] Incolla un link nel Video Downloader, nella Gallery, cerca nel Thumbnail Tester, carica la libreria Audible, controlla gli aggiornamenti in Binaries: ogni volta vedi cosa sta facendo, i secondi che passano e (quando lo strumento scrive qualcosa) **Details**.
 - [ ] Settings → Tools: trascina un tool dalla maniglia ⋮⋮ (o selezionala e usa Alt+↑/↓). La sidebar cambia subito e l'ordine resta dopo il riavvio.
 
+## 17. Thumbnail Tester (giro 4)
+- [ ] Cerca la tua nicchia e leggi il tuo canale e un altro: sotto i campi compaiono come scelte rapide (un clic per tornarci). Il dado non riempie la lista.
+- [ ] Dopo qualche secondo le date dei video diventano quelle vere ("3 years ago" ecc.).
+- [ ] **Outliers**: su ogni video compare visualizzazioni ÷ iscritti; da ×3 in su è evidenziato, gli altri sbiaditi (servono gli iscritti dei canali, arrivano uno alla volta).
+- [ ] Scrivi il titolo della tua thumbnail e premi **Find similar**: cerca i video con cui competi.
+- [ ] Chiudi e riapri: stessa ricerca, stesse scelte rapide.
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.
