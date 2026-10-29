@@ -28,7 +28,7 @@ Aggiornato a ogni tranche. Le prove a mano sono in [TEST-TODO.md](TEST-TODO.md),
 | T23 | Sfondi per ogni tool: un PNG trasparente disegnato appena visibile dietro la pagina, editor dal pulsante Backdrop (9 stili, visibilità, grandezza, dettaglio, sfocatura, posizione, colore, specchio, "applica a tutti") | v0.8.0 |
 | T24 | Anya, la compagna: faccia nel logo e nell'icona, pose per ogni tool con i colori di Hermes, wobble, schiacciata quando parla con la voce, idle che "lavora", consigli, citazioni dei videogiochi con commento suo, festa quando un lavoro finisce; impostazioni per grandezza, volume, posizione, wobble, quanto parla | v0.8.0 |
 | fix | Aggiornamenti anche quando GitHub limita le richieste (Hermes legge la pagina della release); logo e icona di Windows dal tuo disegno con i colori di Hermes; Image Upscale senza la posa scura | v0.8.1 |
-| T25 | Gallery più veloce: legge solo un'anteprima (60 file + il totale), poi scarica tutto in un solo passaggio con filtri e scelte; n / totale in coda e ripresa dopo la chiusura; cookie per E-Hentai/ExHentai (originali), utile anche per Pixiv e X; anteprime che non si sovrappongono più con gallerie grandi; il fumetto di Anya non blocca più i clic sotto | da pubblicare |
+| T25 | Gallery più veloce: legge solo un'anteprima (60 file + il totale), poi scarica tutto in un solo passaggio con filtri e scelte; n / totale in coda e ripresa dopo la chiusura; cookie per E-Hentai/ExHentai (originali), utile anche per Pixiv e X; anteprime che non si sovrappongono più con gallerie grandi; il fumetto di Anya non blocca più i clic sotto | v0.9.0 |
 
 Provato e scartato: FLAC da SpotiFLAC (server non funzionanti), Mornye (app per telefono, estensioni di terzi).
 FLAC abbandonato per scelta (ottobre 2026).
