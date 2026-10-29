@@ -2,7 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { h, modal, saveSettings, settings } from "./core";
 import { icon } from "./icons";
-import { SITES, validateCookies } from "./cookies-validate";
+import { SITES, validateCookies, withMirror } from "./cookies-validate";
 
 export type Mode = "auto" | "firefox" | "chrome" | "edge" | "brave" | "file" | "none";
 const LABEL: Record<Mode, string> = {
@@ -117,7 +117,7 @@ function showCookiesModal(site: string, reason?: string): Promise<boolean> {
           label: "Save", primary: true,
           run: async () => {
             const m = select.value as Mode;
-            if (m === "file" && validText) await invoke("cookies_write", { site, text: validText });
+            if (m === "file" && validText) await invoke("cookies_write", { site, text: withMirror(validText, s) });
             if (m === "file" && !validText && !(await invoke("cookies_path", { site }))) {
               result.className = "ck-result bad";
               result.textContent = "Drop a valid cookies.txt first.";

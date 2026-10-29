@@ -1,6 +1,7 @@
 // Gallery Downloader module (SPEC 6): gallery-dl with a preview grid and built-in filters.
-// Filters and manual picks are resolved here; gallery-dl receives the final file set as an
-// "image-filter" expression in a per-job config file (no command-line length limit).
+// Hermes reads only a preview (the first PREVIEW files: some sites pause seconds per file, e-hentai ~4 s),
+// then gallery-dl downloads the whole URL in one pass with the filters and manual picks as one
+// "image-filter" expression (gallery-filter.ts) in a per-job config file (no command-line length limit).
 import { invoke } from "@tauri-apps/api/core";
 import { toolStatus, binariesReady } from "../binaries";
 import { cookieArgs, cookieLabel, cookiesModal, isCookieError, markBroken } from "../cookies";
@@ -9,13 +10,9 @@ import { banner, clearers, h, memory, saveSettingsSoon, settings } from "../core
 import { icon } from "../icons";
 import { addJobs, mountQueue, Step } from "../queue";
 import { eagleControls, folderField, liveStatus, paths } from "./common";
+import { Filters, filterExpr, Kind, kindOf, TEXT_KEYS, words } from "./gallery-filter";
 
-type Kind = "image" | "video" | "gif";
-type Filters = {
-  types: Record<Kind, boolean>; extOff: string[]; minW: number; minH: number;
-  sizeMin: number; sizeMax: number; dateFrom: string; dateTo: string; limit: number; skipDownloaded: boolean;
-  titleHas: string; titleNot: string; // comma-separated words matched against title/description
-};
+const PREVIEW = 60;
 type Prefs = { folder: string; eagle: boolean; filters: Filters; url: string; offKeys: string[]; previews: boolean };
 type Item = {
   key: string; url: string; ext: string; kind: Kind; w: number; h: number; date: number | null; author: string; off: boolean;
@@ -26,15 +23,8 @@ const DEFAULT_FILTERS: Filters = {
   types: { image: true, video: true, gif: true }, extOff: [], minW: 0, minH: 0,
   sizeMin: 0, sizeMax: 0, dateFrom: "", dateTo: "", limit: 200, skipDownloaded: true, titleHas: "", titleNot: "",
 };
-const words = (s: string) => s.split(",").map((w) => w.trim().toLowerCase()).filter(Boolean);
 const textOf = (m: Record<string, any>) =>
-  ["title", "description", "content", "caption", "text", "summary"].map((k) => m[k]).find((v) => typeof v === "string" && v.trim())?.replace(/\s+/g, " ").trim() ?? "";
-const VIDEO = ["mp4", "webm", "mov", "mkv", "m4v", "avi"];
-
-function kindOf(ext: string): Kind {
-  if (ext === "gif") return "gif";
-  return VIDEO.includes(ext) ? "video" : "image";
-}
+  TEXT_KEYS.map((k) => m[k]).find((v) => typeof v === "string" && v.trim())?.replace(/\s+/g, " ").trim() ?? "";
 
 /** Author/user name: extractors name it differently and sometimes nest it. */
 function authorOf(m: Record<string, any>): string {
@@ -53,16 +43,18 @@ function authorOf(m: Record<string, any>): string {
 const parseDate = (d: unknown) => (typeof d === "string" && /^\d{4}-\d\d-\d\d/.test(d) ? Date.parse(d.replace(" ", "T") + "Z") : null);
 
 /** Messages from `gallery-dl -j`: [3, url, meta] is a file. */
-function parse(messages: unknown[]): { items: Item[]; category: string; queued: number } {
+function parse(messages: unknown[]): { items: Item[]; category: string; queued: number; total: number } {
   const items: Item[] = [];
   let category = "";
   let queued = 0;
+  let total = 0; // files at the URL, when the site says (e-hentai "filecount", some "count")
   for (const m of messages as any[]) {
     if (!Array.isArray(m)) continue;
     if (m[0] === 6) queued++;
     if (m[0] !== 3 || typeof m[1] !== "string") continue;
     const meta = m[2] ?? {};
     category ||= meta.category ?? "";
+    total ||= Number(meta.filecount ?? meta.count) || 0;
     const ext = String(meta.extension ?? m[1].split("?")[0].split(".").pop() ?? "").toLowerCase();
     items.push({
       key: `${meta.filename ?? ""}.${ext}`, url: m[1], ext, kind: kindOf(ext),
@@ -70,7 +62,7 @@ function parse(messages: unknown[]): { items: Item[]; category: string; queued: 
       title: textOf(meta),
     });
   }
-  return { items, category, queued };
+  return { items, category, queued, total };
 }
 
 function passes(i: Item, f: Filters): boolean {
@@ -87,13 +79,11 @@ function passes(i: Item, f: Filters): boolean {
   return true;
 }
 
-/** Python set literal of the chosen files for gallery-dl's image-filter (JSON strings are valid Python). */
-const filterExpr = (keys: string[]) => `(filename + '.' + extension) in {${keys.map((k) => JSON.stringify(k)).join(", ")}}`;
 
 // module scope: a read started on an earlier visit finishes into the page that is open now (`ui`),
 // and coming back to the tool shows the list already read instead of reading it again
 let items: Item[] = [];
-let source = { url: "", category: "" };
+let source = { url: "", category: "", total: 0 };
 let probing = 0;
 let reading = false;
 const live = liveStatus("gallery-read");
@@ -170,8 +160,8 @@ export function renderGallery(view: HTMLElement) {
       <div class="f-group"><div class="field-label">File size (MB)</div>
         <div class="f-pair"><input type="number" min="0" data-num="sizeMin" value="${f.sizeMin || ""}" placeholder="Min"><span>to</span><input type="number" min="0" data-num="sizeMax" value="${f.sizeMax || ""}" placeholder="Max"></div>
         <div class="sub">Checked while downloading</div></div>
-      <div class="f-group"><div class="field-label">Items to read</div>
-        <input type="number" min="1" step="50" data-num="limit" value="${f.limit}"><div class="sub">First N files of the URL; Fetch again after changing</div></div>
+      <div class="f-group"><div class="field-label">Download at most</div>
+        <input type="number" min="1" step="50" data-num="limit" value="${f.limit}"><div class="sub">Files, counted after the filters. The preview shows the first ${PREVIEW}.</div></div>
       <label class="f-check"><input type="checkbox" data-bool="skipDownloaded" ${f.skipDownloaded ? "checked" : ""}>Skip already downloaded</label>`;
     fp.querySelectorAll<HTMLInputElement>("[data-text]").forEach((t) => (t.value = (f as any)[t.dataset.text!]));
   }
@@ -205,13 +195,24 @@ export function renderGallery(view: HTMLElement) {
 
   // ----- grid -----
   const selected = () => items.filter((i) => !i.off && passes(i, prefs.filters));
+  /** The preview is only the start of the URL: more files than it shows. */
+  const partial = () => items.length >= PREVIEW || source.total > items.length;
+  /** How many files the download will take: known exactly only when the preview holds everything. */
+  const expected = () => {
+    const f = prefs.filters;
+    if (!partial()) return Math.min(selected().length, f.limit);
+    return Math.min(source.total || f.limit, f.limit);
+  };
   function renderGrid() {
     const visible = items.filter((i) => passes(i, prefs.filters));
     const sel = selected();
+    const more = partial()
+      ? ` · preview of the first ${items.length}${source.total ? ` of ${source.total}` : ""}: the filters apply to every file, up to ${prefs.filters.limit}`
+      : "";
     $("#g-summary").textContent = items.length
-      ? `${sel.length} of ${items.length} selected${visible.length < items.length ? ` · ${items.length - visible.length} hidden by filters` : ""}`
+      ? `${sel.length} of ${items.length} selected${visible.length < items.length ? ` · ${items.length - visible.length} hidden by filters` : ""}${more}`
       : "Fetch a URL to preview its files";
-    addBtn.disabled = !sel.length;
+    addBtn.disabled = partial() ? !items.length : !sel.length;
     $("#g-all").hidden = $("#g-none").hidden = !prefs.previews;
     if (!prefs.previews) {
       // previews off (default): no per-file list, only the counts; the filters decide what downloads
@@ -266,10 +267,10 @@ export function renderGallery(view: HTMLElement) {
     items = [];
     reading = true;
     ui.loading(true);
-    live.set(`Reading the gallery (up to ${prefs.filters.limit} files)`);
+    live.set(`Reading the first ${Math.min(PREVIEW, prefs.filters.limit)} files for the preview`);
     await binariesReady;
     const run = (cookies: string[]) => invoke<unknown[]>("tool_json", {
-      id: live.stream(), bin: "gallery-dl.exe", args: ["--resolve-json", "--range", `1-${prefs.filters.limit}`, ...cookies, url],
+      id: live.stream(), bin: "gallery-dl.exe", args: ["--resolve-json", "--range", `1-${Math.min(PREVIEW, prefs.filters.limit)}`, ...cookies, url],
     });
     // the category (= cookie site) is only known after a first read
     const known = siteForUrl(url);
@@ -290,7 +291,7 @@ export function renderGallery(view: HTMLElement) {
     items = parsed.items;
     if (url === prefs.url) items.forEach((i) => (i.off = prefs.offKeys.includes(i.key))); // restore picks for the same URL
     else { prefs.url = url; prefs.offKeys = []; save(); }
-    source = { url, category: parsed.category || known };
+    source = { url, category: parsed.category || known, total: parsed.total };
     ui.show();
     if (!items.length) {
       ui.fail(parsed.queued ? "This page only links to other galleries. Open one of them instead." : "No files found at this URL.");
@@ -318,12 +319,15 @@ export function renderGallery(view: HTMLElement) {
   // ----- add -----
   addBtn.onclick = async () => {
     const sel = selected();
-    if (!sel.length) return;
+    if (!sel.length && !partial()) return;
     const f = prefs.filters;
+    const n = expected();
     const { data } = await paths;
+    // one pass over the whole URL: gallery-dl applies the filters and skips the files turned off in the preview
+    const off = [...new Set(items.filter((i) => i.off).map((i) => i.key))];
     const config = await invoke<string>("write_job_file", {
       name: `gallery-${Date.now()}.json`,
-      text: JSON.stringify({ extractor: { "image-filter": filterExpr([...new Set(sel.map((i) => i.key))]) } }),
+      text: JSON.stringify({ extractor: { "image-filter": filterExpr(f, off) } }),
     });
     const args = [
       "--config", config, "-d", prefs.folder, "--range", `1-${f.limit}`,
@@ -332,12 +336,13 @@ export function renderGallery(view: HTMLElement) {
       ...(f.skipDownloaded ? ["--download-archive", `${data}\\gallery-archive.sqlite3`] : []),
       ...(await siteCookies(source.category)), source.url,
     ];
-    const steps: Step[] = [{ type: "run", label: "Downloading", bin: "gallery-dl.exe", parser: "galleryDl", duration: sel.length, args }];
+    const steps: Step[] = [{ type: "run", label: "Downloading", bin: "gallery-dl.exe", parser: "galleryDl", duration: n, args }];
     if (prefs.eagle) steps.push({ type: "eagle" });
     const author = sel.find((i) => i.author)?.author ?? "";
-    const title = `${author || source.category || "Gallery"} · ${sel.length} file${sel.length > 1 ? "s" : ""}`;
+    const upTo = partial() ? "up to " : ""; // filters and picks apply to files Hermes has not read
+    const title = `${author || source.category || "Gallery"} · ${upTo}${n} file${n > 1 ? "s" : ""}`;
     await addJobs([{ module: "gallery", title, pill: source.category || "gallery", steps, eagle: { website: source.url, tags: [author, source.url].filter(Boolean) } }]);
-    banner({ id: "gallery-added", icon: "check", text: `Added <b>${sel.length}</b> file${sel.length > 1 ? "s" : ""} to the queue.` });
+    banner({ id: "gallery-added", icon: "check", text: `Added <b>${upTo}${n}</b> file${n > 1 ? "s" : ""} to the queue.${partial() ? " The progress is in the queue below; closing Hermes resumes it next time." : ""}` });
   };
 
   renderFilters();

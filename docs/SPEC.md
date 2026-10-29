@@ -310,6 +310,16 @@ hermes-data/
 - Right-click: say something, game quote, hush for an hour, mute, settings, hide. Settings: on/off, voice, volume,
   size, position, wobble (off / gentle / lively), how often she talks. Everything survives restarts.
 
+## 25. Faster Gallery Downloader (T25)
+
+- Some sites pause between files (e-hentai about 4 s each), so reading a whole gallery before downloading could
+  take as long as the download. Hermes now reads only a preview (the first 60 files, plus the total when the site
+  reports it) and downloads the whole URL in one pass: every filter (types, extensions, size, resolution, date,
+  title words, "download at most N") and the files turned off in the preview are passed to gallery-dl.
+- The queue shows n / total; closing Hermes mid-download resumes it next time (files on disk are skipped).
+- E-Hentai cookies (ipb_member_id + ipb_pass_hash) give the original images and ExHentai; Pixiv and X already had
+  cookies. Originals count against the account's image quota.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.

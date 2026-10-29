@@ -182,7 +182,6 @@ export function startAnya() {
     r < 0.25 ? plain(pick(T.POKE)) : r < 0.6 ? line("tool") : quote(page);
   };
   stage.oncontextmenu = (e) => { e.preventDefault(); menu(e.clientX, e.clientY); };
-  bubble.onclick = () => bubble.classList.remove("show");
   addEventListener("pointerdown", () => (lastAct = Date.now()), true);
   addEventListener("keydown", () => (lastAct = Date.now()), true);
   setInterval(() => {

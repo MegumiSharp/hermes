@@ -1,6 +1,7 @@
 // Netscape cookies.txt validation (pure: also run by scripts/t4-test.mjs under plain node).
 
-export type Site = { name: string; domain: string; login: string[]; url: string };
+/** `hosts`: other hosts of the same site; `mirror`: a domain the login cookies are copied to (ExHentai uses the E-Hentai account). */
+export type Site = { name: string; domain: string; login: string[]; url: string; hosts?: string[]; mirror?: string };
 
 /** Keys match yt-dlp's site and gallery-dl's extractor category. */
 export const SITES: Record<string, Site> = {
@@ -9,13 +10,25 @@ export const SITES: Record<string, Site> = {
   twitter: { name: "X (Twitter)", domain: "x.com", login: ["auth_token"], url: "https://x.com" },
   pixiv: { name: "Pixiv", domain: "pixiv.net", login: ["PHPSESSID"], url: "https://www.pixiv.net" },
   reddit: { name: "Reddit", domain: "reddit.com", login: ["reddit_session", "token_v2"], url: "https://www.reddit.com" },
+  exhentai: { name: "E-Hentai", domain: "e-hentai.org", hosts: ["exhentai.org"], mirror: "exhentai.org", login: ["ipb_member_id", "ipb_pass_hash"], url: "https://e-hentai.org" },
 };
 
 /** Site key whose domain the URL's host belongs to ("" if none). */
 export function siteForUrl(url: string): string {
   let host = "";
   try { host = new URL(url).hostname; } catch { return ""; }
-  return Object.keys(SITES).find((k) => host === SITES[k].domain || host.endsWith(`.${SITES[k].domain}`)) ?? "";
+  const on = (d: string) => host === d || host.endsWith(`.${d}`);
+  return Object.keys(SITES).find((k) => [SITES[k].domain, ...(SITES[k].hosts ?? [])].some(on)) ?? "";
+}
+
+/** The cookies.txt to store: the file as given, plus its rows copied to the site's `mirror` domain. */
+export function withMirror(text: string, site: Site): string {
+  if (!site.mirror) return text;
+  const rows = text.split(/\r?\n/).filter((l) => {
+    const d = l.replace(/^#HttpOnly_/, "").split("\t")[0]?.replace(/^\./, "");
+    return d === site.domain || d?.endsWith(`.${site.domain}`);
+  });
+  return `${text.trimEnd()}\n${rows.map((l) => l.replace(/^(#HttpOnly_)?\.?[^\t]+/, `$1.${site.mirror}`)).join("\n")}\n`;
 }
 
 export type CookieCheck = { ok: boolean; count: number; signedIn: boolean; expires: number | null; error?: string };

@@ -32,7 +32,8 @@ const seenLive = (page) => page.evaluate(() => window.__live);
 const sidebar = (page) => page.$$eval(".nav[data-id]", (n) => n.map((x) => x.dataset.id));
 
 rmSync(join(DATA, "queue.json"), { force: true });
-writeFileSync(join(DATA, "settings.json"), JSON.stringify({ lastModule: "video", autoUpdateYtdlp: false, cookies: { youtube: "none" }, video: { eagle: false } }));
+// Thumbnail Tester starts 6th: the Settings list is taller than the window, the drag needs both rows on screen
+writeFileSync(join(DATA, "settings.json"), JSON.stringify({ lastModule: "video", autoUpdateYtdlp: false, cookies: { youtube: "none" }, video: { eagle: false }, toolOrder: ["video", "spotify", "gallery", "rembg", "upscale", "thumbs"] }));
 let app = await launch(EXE);
 let { page } = app;
 await page.waitForSelector("#v-url");
@@ -53,7 +54,7 @@ await page.click('.nav[data-id="gallery"]');
 await page.fill("#g-url", "https://example.com/");
 await page.click("#g-fetch");
 await until(() => page.isVisible("#g-grid .g-error"), "gallery: error shown", 60000);
-check((await seenLive(page)).some((t) => t.startsWith("Reading the gallery")), "gallery: live status shown while reading");
+check((await seenLive(page)).some((t) => t.startsWith("Reading the first")), "gallery: live status shown while reading");
 check(!(await page.isVisible("#g-live .live")), "gallery: status gone after the error");
 
 // Thumbnail Tester
@@ -71,11 +72,11 @@ await until(async () => (await seenLive(page)).some((t) => t.startsWith("Checkin
 check(true, "binaries: update check shows live status");
 await page.screenshot({ path: join(OUT, "t17-binaries.png") });
 
-// Tool order: drag Thumbnail Tester (last tool) to the top
+// Tool order: drag Thumbnail Tester (6th) to the top
 await page.click('.nav[data-id="settings"]');
 await page.waitForSelector('.tool-row[data-order="thumbs"] .grip');
 const before = await sidebar(page);
-await page.$eval("#tool-toggles", (el) => el.scrollIntoView({ block: "start" })); // first and last rows both on screen
+await page.$eval("#tool-toggles", (el) => el.scrollIntoView({ block: "start" })); // first and 6th rows both on screen
 await sleep(300);
 const grip =await page.$('.tool-row[data-order="thumbs"] .grip');
 const first = await page.$(".tool-row");

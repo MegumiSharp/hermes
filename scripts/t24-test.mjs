@@ -48,7 +48,7 @@ check(list.b <= a.y + 2, "the tool list ends above her (it scrolls instead of hi
 await page.screenshot({ path: join(OUT, "t24.png") });
 
 // click: talks (typing + squish), then a line
-await page.click(".anya-bubble"); // dismiss hello
+check(await page.$eval(".anya-bubble", (b) => getComputedStyle(b).pointerEvents === "none"), "her bubble never blocks clicks on the page under it");
 await page.click(".anya .stage");
 await until(() => page.$eval(".anya", (x) => x.classList.contains("talking")), "squish while talking", 3000);
 check(true, "clicking her makes her talk (squish animation on)");
@@ -73,7 +73,6 @@ check(true, "pose changes with the tool (Pixel Art typing, Documents impress, Im
 
 // a job ends: she cheers with the donation pose
 const out = join(W, "clip.mp4").replace(/\//g, "\\");
-await page.click(".anya-bubble").catch(() => {});
 await invoke(page, "queue_add", { jobs: [{ module: "converter", title: "anya test", steps: [{ type: "run", label: "x", bin: "ffmpeg.exe", parser: "ffmpeg", args: ["-y", "-f", "lavfi", "-i", "testsrc=duration=1:size=64x64", out] }] }] });
 await until(async () => (await pose(page)) === "donation", "cheer pose when the job is done", 30000);
 const cheer = await spoken(page, "job done line");
