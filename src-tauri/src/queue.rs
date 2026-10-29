@@ -553,6 +553,10 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
     let mut rate_limited = false;
     let mut last_tick = 0;
     let mut count = 0u32; // GalleryDl files seen
+    // Percent: tools that print one bar per pass (Demucs: "a bag of 4 models" = 4 bars per track) move one bar 0-100%
+    let (mut bars, mut pass, mut prev) = (1u32, 0u32, 0f64);
+    // only tools that talk to sites can be rate-limited; local ones (Demucs, Whisper, Real-ESRGAN, FFmpeg) never are
+    let networked = !matches!(parser, Parser::Percent | Parser::Ffmpeg);
     let mut stages: HashMap<String, f64> = HashMap::new(); // SpotDl: song -> share done
     tick(id, 0.0, label.into());
     log_line(id, &format!("> {label}: {bin} {}", args.join(" ")));
@@ -570,7 +574,7 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
             continue;
         }
         let lower = line.to_lowercase();
-        if ["http error 429", "429 too many requests", "sign in to confirm you", "rate-limit", "rate limit"].iter().any(|s| lower.contains(s)) {
+        if networked && ["http error 429", "429 too many requests", "sign in to confirm you", "rate-limit", "rate limit"].iter().any(|s| lower.contains(s)) {
             rate_limited = true;
         }
         // console log: everything except progress-bar noise (template ticks, ffmpeg key=value, bare %)
@@ -627,7 +631,21 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
                     (count as f64 / total, format!("{label} {count} / {total:.0} · {name}"))
                 })
             }
-            Parser::Percent => percent(line).map(|p| (p / 100.0, format!("{label} {p:.0}%"))),
+            Parser::Percent => {
+                if let Some(n) = lower.split("bag of ").nth(1).and_then(|r| r.split(' ').next()).and_then(|n| n.parse::<u32>().ok()) {
+                    bars = n.max(1);
+                }
+                percent(line).map(|p| {
+                    if p + 20.0 < prev {
+                        pass += 1; // a new bar started
+                        bars = bars.max(pass + 1);
+                    }
+                    prev = p;
+                    let total = ((pass as f64 + p / 100.0) / bars as f64 * 100.0).min(100.0);
+                    let of = if bars > 1 { format!(" · pass {} of {bars}", pass + 1) } else { String::new() };
+                    (total / 100.0, format!("{label} {total:.0}%{of}"))
+                })
+            }
             Parser::SpotDl => {
                 // songs run in parallel and each takes ~20 s: their stages move the bar, not only finished songs
                 let finished = line.starts_with("Downloaded ") || line.starts_with("Skipping ");
@@ -659,7 +677,8 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
     if !still_running {
         return Err(Stop::Cancelled);
     }
-    if rate_limited {
+    // a warning about rate limits in a run that worked (e.g. Hugging Face's "higher rate limits" hint) is not one
+    if rate_limited && !matches!(status, Ok(ref s) if s.success()) {
         return Err(Stop::RateLimited);
     }
     match status {

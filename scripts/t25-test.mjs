@@ -83,13 +83,15 @@ check(!got.includes("frame-01.png") && !got.includes("frame-07.png") && got.incl
 // browser cookies that can't be decrypted (Edge/Chrome DPAPI on this PC): Hermes says so instead of going on silently
 await app.close();
 const s2 = JSON.parse(readFileSync(join(DATA, "settings.json"), "utf8"));
-writeFileSync(join(DATA, "settings.json"), JSON.stringify({ ...s2, cookies: { ...s2.cookies, exhentai: "edge" }, gallery: { ...s2.gallery, filters: { ...s2.gallery.filters, limit: 3 } } }));
+writeFileSync(join(DATA, "settings.json"), JSON.stringify({ ...s2, cookies: { ...s2.cookies, exhentai: "edge" }, gallery: { ...s2.gallery, filters: { ...s2.gallery.filters, limit: 200 } } })); // full 60-file preview: minutes on e-hentai
 app = await launch(EXE);
 page = app.page;
 await page.waitForSelector("#g-url");
 await page.fill("#g-url", "https://e-hentai.org/g/3316769/e41fd7e0fc/");
+const tc = Date.now();
 await page.click("#g-fetch");
-const modal = await until(() => page.$(".modal .cookies"), "cookie window after the decrypt warning", 120000);
+await until(() => page.$(".modal .cookies"), "cookie window after the cookie warning", 30000);
+check(!/selected/.test(await page.textContent("#g-summary")), `the cookie window opens while the preview is still being read (${((Date.now() - tc) / 1000).toFixed(1)} s)`);
 check(/could not read your browser/i.test(await page.textContent(".modal")), `the cookie window says why: ${(await page.textContent(".modal .banner")).trim().slice(0, 140)}`);
 await page.keyboard.press("Escape");
 await until(async () => /unavailable/i.test(await page.textContent("#g-cookies")), "chip says cookies unavailable");

@@ -24,7 +24,7 @@ function onSecondScreen(dataDir) {
   if (!second) return;
   const file = join(dataDir, "settings.json");
   const settings = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
-  if (settings.window) return;
+  if (settings.window && !settings.window.maximized) return; // a maximized window left by an earlier run would break the window tests
   mkdirSync(dataDir, { recursive: true });
   writeFileSync(file, JSON.stringify({ ...settings, window: { ...second, width: 1180, height: 760, maximized: false } }));
 }

@@ -269,15 +269,27 @@ export function renderGallery(view: HTMLElement) {
     ui.loading(true);
     live.set(`Reading the first ${Math.min(PREVIEW, prefs.filters.limit)} files for the preview`);
     await binariesReady;
-    // browser cookies that can't be decrypted (Chrome/Edge DPAPI) are only a warning: gallery-dl goes on
-    // without them, so catch it here instead of silently reading resized/public files
+    // the category (= cookie site) is only known after a first read
+    const known = siteForUrl(url);
+    // browser cookies that can't be read (Chrome/Edge: DPAPI, file locked) are only a warning: gallery-dl goes on
+    // without them. Say so the moment it shows up (the first seconds), not after the whole preview read
     let cookieWarning = "";
-    const watch = (line: string) => { if (!cookieWarning && /\[cookies\]\[warning\]|\]\[warning\] cookies:/.test(line)) cookieWarning = line.replace(/^\[[^\]]+\]\[warning\]\s*/, ""); };
+    const cookieProblem = (why: string, category: string) => {
+      if (!category || id !== probing) return;
+      markBroken(category); // no browser cookies this session; the chip says so
+      source = { ...source, category }; // known from the link already: the chip can show it during the read
+      cookieChip.hidden = false;
+      refreshCookies();
+      cookiesModal(category, why).then((c) => c && probe()); // a cookies.txt picked now restarts the read with it
+    };
+    const watch = (line: string) => {
+      if (cookieWarning || !/\[cookies\]\[warning\]|\]\[warning\] cookies:/.test(line)) return;
+      cookieWarning = line.replace(/^\[[^\]]+\]\[warning\]\s*/, "");
+      cookieProblem(cookieWarning, known);
+    };
     const run = (cookies: string[]) => invoke<unknown[]>("tool_json", {
       id: live.stream(watch), bin: "gallery-dl.exe", args: ["--resolve-json", "--range", `1-${Math.min(PREVIEW, prefs.filters.limit)}`, ...cookies, url],
     });
-    // the category (= cookie site) is only known after a first read
-    const known = siteForUrl(url);
     let result: unknown[];
     try {
       result = await run(await siteCookies(known));
@@ -296,10 +308,7 @@ export function renderGallery(view: HTMLElement) {
     if (url === prefs.url) items.forEach((i) => (i.off = prefs.offKeys.includes(i.key))); // restore picks for the same URL
     else { prefs.url = url; prefs.offKeys = []; save(); }
     source = { url, category: parsed.category || known, total: parsed.total };
-    if (cookieWarning && site()) {
-      markBroken(site()); // read without cookies this session; the chip says so
-      cookiesModal(site(), cookieWarning).then((c) => c && probe());
-    }
+    if (cookieWarning && !known) cookieProblem(cookieWarning, site()); // site only known now (URL host not in SITES)
     ui.show();
     if (!items.length) {
       ui.fail(parsed.queued ? "This page only links to other galleries. Open one of them instead." : "No files found at this URL.");
