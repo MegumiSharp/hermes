@@ -30,8 +30,8 @@ Aggiornato a ogni tranche. Le prove a mano sono in [TEST-TODO.md](TEST-TODO.md),
 | fix | Aggiornamenti anche quando GitHub limita le richieste (Hermes legge la pagina della release); logo e icona di Windows dal tuo disegno con i colori di Hermes; Image Upscale senza la posa scura | v0.8.1 |
 | T25 | Gallery più veloce: legge solo un'anteprima (60 file + il totale), poi scarica tutto in un solo passaggio con filtri e scelte; n / totale in coda e ripresa dopo la chiusura; cookie per E-Hentai/ExHentai (originali), utile anche per Pixiv e X; anteprime che non si sovrappongono più con gallerie grandi; il fumetto di Anya non blocca più i clic sotto | v0.9.0 |
 | fix | Gallery: se i cookie del browser non si leggono (Chrome/Edge li cifrano o li bloccano) Hermes te lo dice e apre la finestra dei cookie, invece di scaricare in silenzio senza | v0.9.1 |
-| fix | Gallery: la finestra dei cookie si apre dopo pochi secondi, non a fine lettura | da pubblicare |
-| fix | Stem Separation: niente più falso "rate limit" (era un avviso di Hugging Face) che faceva ripartire la separazione all'infinito; una sola barra per file anche con htdemucs_ft (4 modelli) | da pubblicare |
+| fix | Gallery: la finestra dei cookie si apre dopo pochi secondi, non a fine lettura | v0.9.2 |
+| fix | Stem Separation: niente più falso "rate limit" (era un avviso di Hugging Face) che faceva ripartire la separazione all'infinito; una sola barra per file anche con htdemucs_ft (4 modelli) | v0.9.2 |
 
 Provato e scartato: FLAC da SpotiFLAC (server non funzionanti), Mornye (app per telefono, estensioni di terzi).
 FLAC abbandonato per scelta (ottobre 2026).
