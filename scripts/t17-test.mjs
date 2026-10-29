@@ -49,14 +49,6 @@ await until(() => page.isVisible("#v-live .live-more").catch(() => false), "vide
 await until(() => page.isVisible("#v-preview .t"), "video: preview after reading", 60000);
 check(!(await page.isVisible("#v-live .live")), "video: status gone when the preview shows");
 
-// Gallery (an unsupported page fails fast: the status must still have shown, then the error)
-await page.click('.nav[data-id="gallery"]');
-await page.fill("#g-url", "https://example.com/");
-await page.click("#g-fetch");
-await until(() => page.isVisible("#g-grid .g-error"), "gallery: error shown", 60000);
-check((await seenLive(page)).some((t) => t.startsWith("Reading the first")), "gallery: live status shown while reading");
-check(!(await page.isVisible("#g-live .live")), "gallery: status gone after the error");
-
 // Thumbnail Tester
 await page.click('.nav[data-id="thumbs"]');
 await page.waitForSelector("#t-dice");

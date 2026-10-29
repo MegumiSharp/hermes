@@ -627,6 +627,10 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
                 is_path.then(|| {
                     let name = std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
                     count += 1;
+                    if duration < 0.0 {
+                        // total unknown (no preview read): at most |duration| files
+                        return (count as f64 / (-duration).max(count as f64), format!("{label} · {count} file{} · {name}", if count == 1 { "" } else { "s" }));
+                    }
                     let total = duration.max(count as f64);
                     (count as f64 / total, format!("{label} {count} / {total:.0} · {name}"))
                 })

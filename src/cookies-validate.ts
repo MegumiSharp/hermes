@@ -13,6 +13,17 @@ export const SITES: Record<string, Site> = {
   exhentai: { name: "E-Hentai", domain: "e-hentai.org", hosts: ["exhentai.org"], mirror: "exhentai.org", login: ["ipb_member_id", "ipb_pass_hash"], url: "https://e-hentai.org" },
 };
 
+/** Cookie key for any URL: a known site, else its host without "www." ("" if the URL is not valid). */
+export function cookieSite(url: string): string {
+  url = url.replace(/^[a-z]+:(?=https?:\/\/)/i, ""); // gallery-dl's "generic:https://…" prefix
+  const known = siteForUrl(url);
+  if (known) return known;
+  try { return new URL(url).hostname.replace(/^www\./, "").toLowerCase(); } catch { return ""; }
+}
+
+/** The site behind a cookie key: a known site, or a plain host (any cookie for it counts, no login check). */
+export const siteInfo = (key: string): Site => SITES[key] ?? { name: key, domain: key, login: [], url: `https://${key}` };
+
 /** Site key whose domain the URL's host belongs to ("" if none). */
 export function siteForUrl(url: string): string {
   let host = "";
@@ -52,6 +63,7 @@ export function validateCookies(text: string, site: Site, now = Date.now()): Coo
   const expiries = live.map(([, , , , exp]) => Number(exp) * 1000).filter((e) => e > 0);
   const expires = expiries.length ? Math.min(...expiries) : null;
   const base = { count: mine.length, expires };
+  if (!site.login.length) return { ...base, ok: true, signedIn: true }; // a site Hermes doesn't know: any of its cookies
   if (!login.length) return { ...base, ok: false, signedIn: false, error: `No login cookies found. Sign in to ${site.name}, then export again.` };
   if (!live.length) return { ...base, ok: false, signedIn: false, error: "The login cookies have expired. Sign in again and re-export." };
   return { ...base, ok: true, signedIn: true };

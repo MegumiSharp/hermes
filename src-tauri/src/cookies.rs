@@ -22,7 +22,8 @@ pub fn detect_browsers() -> Vec<&'static str> {
 }
 
 fn file(site: &str) -> Result<PathBuf, String> {
-    if site.is_empty() || !site.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+    // a known site id or a host name (any site can have cookies); never a path
+    if site.is_empty() || site.contains("..") || !site.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.') {
         return Err("invalid site id".into());
     }
     let dir = data_dir().join("cookies");

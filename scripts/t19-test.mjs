@@ -65,10 +65,10 @@ check(jobs.some((j) => j.module === "converter" && j.state === "done" && j.steps
 check(jobs.some((j) => j.module === "upscale" && j.state === "failed"), "failed job recorded");
 
 // a wait
-await page.click('.nav[data-id="gallery"]');
-await page.fill("#g-url", "https://example.com/");
-await page.click("#g-fetch");
-await until(() => events().some((e) => e.type === "wait" && e.kind === "gallery-read"), "wait recorded", 60000);
+await page.click('.nav[data-id="video"]');
+await page.fill("#v-url", "https://example.com/");
+await page.click("#v-fetch");
+await until(() => events().some((e) => e.type === "wait" && e.kind === "video-read"), "wait recorded", 60000);
 check(true, "waits recorded with their kind");
 
 // privacy: nothing personal anywhere

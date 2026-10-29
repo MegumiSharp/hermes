@@ -2,7 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { h, modal, saveSettings, settings } from "./core";
 import { icon } from "./icons";
-import { SITES, validateCookies, withMirror } from "./cookies-validate";
+import { siteInfo, validateCookies, withMirror } from "./cookies-validate";
 
 export type Mode = "auto" | "firefox" | "chrome" | "edge" | "brave" | "file" | "none";
 const LABEL: Record<Mode, string> = {
@@ -50,17 +50,22 @@ export function markBroken(site: string) {
 /** Cookie settings + manual import. `reason` = why browser extraction failed. Resolves true if anything changed. */
 let openModal: Promise<boolean> | null = null; // several probes failing at once share one modal
 
-export function cookiesModal(site: string, reason?: string): Promise<boolean> {
-  openModal ??= showCookiesModal(site, reason).finally(() => (openModal = null));
+/** `first`: the first download from this site, so ask once (the choice is remembered, Cancel = no cookies). */
+export function cookiesModal(site: string, reason?: string, first = false): Promise<boolean> {
+  openModal ??= showCookiesModal(site, reason, first).finally(() => (openModal = null));
   return openModal;
 }
 
-function showCookiesModal(site: string, reason?: string): Promise<boolean> {
-  const s = SITES[site];
+/** True once a cookie source was chosen (or declined) for the site. */
+export const cookiesAsked = (site: string) => settings.cookies?.[site] !== undefined;
+
+function showCookiesModal(site: string, reason?: string, first = false): Promise<boolean> {
+  const s = siteInfo(site);
   return new Promise(async (resolve) => {
     const found = await browsers;
     const body = h(`<div class="cookies">
       ${reason ? `<div class="banner warn">${icon("alert")}<span class="txt"></span></div>` : ""}
+      ${first ? `<div class="banner">${icon("cookie")}<span class="txt first"></span></div>` : ""}
       <label class="field-label" for="ck-mode">Cookie source</label>
       <select id="ck-mode" class="select"></select>
       <div class="ck-title">Import a cookies.txt file</div>
@@ -77,6 +82,10 @@ function showCookiesModal(site: string, reason?: string): Promise<boolean> {
       body.querySelector(".banner .txt")!.textContent =
         `Hermes could not read your browser's ${s.name} cookies (${reason}). Chromium browsers on Windows encrypt cookies and must be fully closed; Firefox works best. Or import them manually below.`;
     }
+    if (first) {
+      body.querySelector(".banner .first")!.textContent =
+        `First download from ${s.domain}. Add your cookies to get full-size files and posts that need an account, or pick “No cookies”. Hermes asks once and remembers.`;
+    }
     const select = body.querySelector<HTMLSelectElement>("#ck-mode")!;
     for (const m of Object.keys(LABEL) as Mode[]) {
       if (["firefox", "chrome", "edge", "brave"].includes(m) && !found.includes(m)) continue;
@@ -85,7 +94,7 @@ function showCookiesModal(site: string, reason?: string): Promise<boolean> {
       o.textContent = m === "auto" ? `Automatic${found[0] ? ` (${LABEL[found[0] as Mode]})` : " (no browser found)"}` : LABEL[m];
       select.append(o);
     }
-    select.value = mode(site);
+    select.value = first ? "file" : mode(site);
 
     let validText: string | null = null;
     const result = body.querySelector(".ck-result")!;
@@ -110,7 +119,10 @@ function showCookiesModal(site: string, reason?: string): Promise<boolean> {
     modal({
       title: `${s.name} cookies`,
       body,
-      onClose: () => resolve(changed),
+      onClose: async () => {
+        if (first && !cookiesAsked(site)) await saveSettings({ cookies: { ...settings.cookies, [site]: "none" } }); // asked once: don't nag
+        resolve(changed);
+      },
       actions: [
         { label: "Cancel" },
         {

@@ -184,11 +184,10 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] In Settings prova grandezza, volume, **Window corner**, wobble Off/Lively, "Talks on her own"; chiudi e riapri: resta tutto.
 - [ ] Quando un download finisce fa festa; quando fallisce te lo dice.
 
-## 25. Gallery più veloce
-- [ ] Incolla la galleria e-hentai: in pochi minuti vedi l'anteprima ("preview of the first 60 of 659"), **Add to queue** parte subito.
-- [ ] Il cookie chip E-Hentai: scegli il tuo cookies.txt; le immagini arrivano alla risoluzione originale.
-- [ ] Chiudi Hermes a metà download e riaprilo: riprende da dove era.
-- [ ] Prova un profilo Pixiv o X grande: anteprima veloce, download di tutto con i filtri.
+## 26. Gallery senza anteprima
+- [ ] Incolla la galleria e-hentai e premi **Download**: la prima volta Hermes ti chiede i cookie di quel sito (scegli il tuo cookies.txt); il download parte subito in coda.
+- [ ] Mettilo in pausa, riprendilo, chiudi Hermes e riaprilo: riprende da dove era.
+- [ ] Un secondo link dallo stesso sito: non ti chiede più i cookie. Il chip in alto li cambia quando vuoi.
 
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).

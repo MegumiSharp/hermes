@@ -320,6 +320,14 @@ hermes-data/
 - E-Hentai cookies (ipb_member_id + ipb_pass_hash) give the original images and ExHentai; Pixiv and X already had
   cookies. Originals count against the account's image quota.
 
+## 26. Gallery without preview (T26)
+
+- The preview is gone (reading first only caused trouble): paste a URL and press **Download**; the whole URL goes
+  straight into the queue, where it can be paused or stopped, with every filter applied by gallery-dl. The queue
+  shows how many files are done ("n files", the total is not known in advance).
+- Cookies are always on: the first download from any site (known or not) asks for its cookies once; the choice
+  (file, browser or none) is remembered per site and can be changed from the cookie chip.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.

@@ -7,7 +7,6 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { check, launch, OUT } from "./smoke.mjs";
-import { serveGallery } from "./gallery-fixture.mjs";
 
 const EXE = resolve("release/Hermes.exe");
 const DATA = resolve("release/hermes-data");
@@ -201,18 +200,6 @@ if (only("spotify")) {
   const mp3 = readdirSync(S).find((f) => f.endsWith(".mp3"));
   check(!!mp3 && /Rick Astley/.test(mp3), `song downloaded: ${mp3}`);
   check((await invoke(page, "queue_log", { id: j.id })).some((l) => l.includes("spotdl")), "console shows spotDL output");
-}
-
-// ================= Gallery without previews =================
-if (only("gallery")) {
-  await page.click('.nav[data-id="gallery"]');
-  const gallery = await serveGallery(join(W, "gallery-src"), resolve("release/hermes-data/bin/ffmpeg.exe")); // local page, no rate limits
-  await page.fill("#g-url", gallery.url);
-  await page.click("#g-fetch");
-  await until(async () => /of \d+ selected/.test(await page.textContent("#g-summary")), "gallery summary", 90000);
-  check((await page.$$("#g-grid > *")).length === 0, "previews off: no file rows, only the summary");
-  check(await page.isHidden("#g-all"), "manual select buttons only with previews");
-  gallery.close();
 }
 
 check(app.errors.length === 0, `no console errors ${app.errors.join(" | ")}`);

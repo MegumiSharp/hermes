@@ -72,51 +72,29 @@ if (only("gallery")) {
 const gallery = await serveGallery(join(W, "gallery-src"), resolve("release/hermes-data/bin/ffmpeg.exe")); // local page, no rate limits
 const GALLERY = gallery.url;
 await page.waitForSelector("#g-url");
-await page.fill("#g-url", GALLERY);
-await page.click("#g-fetch");
-// leaving the tool while it reads and coming back still shows the list
-await page.click('.nav[data-id="rembg"]');
-await page.click('.nav[data-id="gallery"]');
-await until(async () => (await page.$$("#g-grid .tile")).length >= 3, "gallery tiles", 90000);
-const total = (await page.$$("#g-grid .tile")).length;
-check(total === 5, `list read while away is shown on return (${total} files)`);
-check(/of \d+ selected/.test(await page.textContent("#g-summary")), `summary: ${await page.textContent("#g-summary")}`);
-await page.screenshot({ path: join(OUT, "t5-grid.png") });
-const exts = await page.$$eval(".f-ext", (b) => b.map((x) => x.dataset.ext));
-check(exts.length >= 1, `extension filters: ${exts.join(", ")}`);
-if (exts.length > 1) {
-  await page.click(`.f-ext[data-ext="${exts.at(-1)}"]`);
-  const after = (await page.$$("#g-grid .tile")).length;
-  check(after < total, `turning off .${exts.at(-1)} hides files (${total} -> ${after})`);
-  await page.click(`.f-ext[data-ext="${exts.at(-1)}"]`);
-}
-await page.click("#g-none");
-check((await page.textContent("#g-summary")).startsWith("0 of"), "select none");
-check(await page.$eval("#g-add", (b) => b.disabled), "Add disabled with nothing selected");
-await page.click("#g-all");
-const tiles = await page.$$("#g-grid .tile");
-await tiles[0].click();
-check((await page.$$("#g-grid .tile.off")).length === 1, "clicking a tile deselects it");
-const want = total - 1;
-await page.click("#g-add");
-j = await lastJobDone(page, "gallery");
+const download = async (url) => {
+  await page.fill("#g-url", url);
+  await page.click("#g-add");
+  if (await page.waitForSelector(".modal .cookies", { timeout: 3000 }).catch(() => null)) await page.click('.modal .m-foot button:has-text("Cancel")');
+  return lastJobDone(page, "gallery");
+};
+check(await page.isHidden("#g-grid").catch(() => true), "no preview: the URL goes straight to the queue");
+await page.fill('[data-ext]', "jpg");
+j = await download(GALLERY);
 const got = walk(G).filter((f) => /\.(jpe?g|png|gif|webp|svg|tiff?)$/i.test(f));
-check(got.length === want, `downloaded exactly the ${want} selected files (${got.length})`);
-check(j.outputs.length === want, "job lists every downloaded file");
+check(got.length === 3 && got.every((f) => f.endsWith(".png")), `Download takes every file that passes the filters (3 PNG, jpg skipped): ${got.length}`);
+check(j.outputs.length === 3, "job lists every downloaded file");
 const mtimes = got.map((f) => statSync(f).mtimeMs).join();
-await page.click("#g-add");
-j = await lastJobDone(page, "gallery");
+j = await download(GALLERY);
 check(got.map((f) => statSync(f).mtimeMs).join() === mtimes, "second run skips already downloaded files (archive, nothing rewritten)");
 
-// one file to Eagle
-await page.click("#g-none");
-await (await page.$$("#g-grid .tile"))[1].click();
+// one file to Eagle (title filter picks it)
+await page.fill('[data-ext]', "");
+await page.fill('[data-text="titleHas"]', "city");
 await page.click("#g-eagle + .box");
-await page.check('[data-bool="skipDownloaded"]').catch(() => {});
 await page.uncheck('[data-bool="skipDownloaded"]');
-await page.click("#g-add");
-j = await lastJobDone(page, "gallery");
-check(j.inEagle && j.outputs.length === 1 && !existsSync(j.outputs[0]), "selected file imported into Eagle and removed from folder");
+j = await download(GALLERY);
+check(j.inEagle && j.outputs.length === 1 && !existsSync(j.outputs[0]), "filtered file imported into Eagle and removed from folder");
 const name = basename(j.outputs[0]).replace(/\.[^.]+$/, "");
 const items = await until(async () => {
   const d = (await (await fetch(`${EAGLE}/item/list?keyword=${encodeURIComponent(name)}&limit=5`)).json()).data;
@@ -124,6 +102,7 @@ const items = await until(async () => {
 }, "gallery item in Eagle", 20000);
 check(items[0].url === GALLERY, "Eagle item keeps the gallery URL");
 await fetch(`${EAGLE}/item/moveToTrash`, { method: "POST", body: JSON.stringify({ itemIds: items.map((i) => i.id) }) });
+await page.fill('[data-text="titleHas"]', "");
 await page.click("#g-eagle + .box");
 gallery.close();
 }
