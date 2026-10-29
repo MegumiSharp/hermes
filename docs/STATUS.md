@@ -32,7 +32,7 @@ Aggiornato a ogni tranche. Le prove a mano sono in [TEST-TODO.md](TEST-TODO.md),
 | fix | Gallery: se i cookie del browser non si leggono (Chrome/Edge li cifrano o li bloccano) Hermes te lo dice e apre la finestra dei cookie, invece di scaricare in silenzio senza | v0.9.1 |
 | fix | Gallery: la finestra dei cookie si apre dopo pochi secondi, non a fine lettura | v0.9.2 |
 | fix | Stem Separation: niente più falso "rate limit" (era un avviso di Hugging Face) che faceva ripartire la separazione all'infinito; una sola barra per file anche con htdemucs_ft (4 modelli) | v0.9.2 |
-| T26 | Gallery senza anteprima: incolli il link e premi **Download**, va subito in coda (pausa/stop lì) con i filtri; cookie per ogni sito, chiesti una sola volta al primo download da quel sito | da pubblicare |
+| T26 | Gallery senza anteprima: incolli il link e premi **Download**, va subito in coda (pausa/stop lì) con i filtri; cookie per ogni sito, chiesti una sola volta al primo download da quel sito | v0.10.0 |
 
 Provato e scartato: FLAC da SpotiFLAC (server non funzionanti), Mornye (app per telefono, estensioni di terzi).
 FLAC abbandonato per scelta (ottobre 2026).
