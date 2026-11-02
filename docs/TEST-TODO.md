@@ -189,6 +189,12 @@ Tieni **Eagle aperto** per i test con Eagle.
 - [ ] Mettilo in pausa, riprendilo, chiudi Hermes e riaprilo: riprende da dove era.
 - [ ] Un secondo link dallo stesso sito: non ti chiede più i cookie. Il chip in alto li cambia quando vuoi.
 
+## 27. Giro di feedback
+- [ ] Gallery: riscarica una galleria già presa: in coda vedi "n new · m already downloaded".
+- [ ] e-hentai senza crediti/quota: compare la barra gialla "E-Hentai image limit reached…" con il timer, e riprende da sola.
+- [ ] Trascina un PDF grande in Document Converter: il box dice subito "Reading …".
+- [ ] Thumbnail Tester: mentre cerca vedi i riquadri grigi; più video; prova **Discover** e **Shuffle**.
+
 ## Limiti noti (da sapere mentre provi)
 - Serve il **Visual C++ Redistributable 2015-2022** (c'è su quasi tutti i PC; se Hermes non parte su un altro PC, è questo).
 - Il primo avvio estrae ~450 MB di strumenti: qualche secondo.

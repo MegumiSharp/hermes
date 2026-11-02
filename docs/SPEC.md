@@ -328,6 +328,17 @@ hermes-data/
 - Cookies are always on: the first download from any site (known or not) asks for its cookies once; the choice
   (file, browser or none) is remembered per site and can be changed from the cookie chip.
 
+## 27. Feedback round (T27)
+
+- Gallery: re-running a URL skips what was already downloaded (archive / files on disk) and says so: "n new · m already
+  downloaded"; on e-hentai the check itself needs one page per image (a few seconds each, same as gallery-dl from a
+  console). E-Hentai's image quota or GP running out no longer fails the download or silently switches to resized
+  images: the queue waits (1, 2, 4, 8, then every 15 min) with the reason in its banner and resumes by itself.
+- Every drop zone shows "Reading <file>…" the moment something is dropped, until the tool has it.
+- Thumbnail Tester: grey placeholders while searching and while thumbnails/logos load; 60 videos per search (Home
+  shows 48); Discover opens a 100-video home feed with your thumbnail at a random place (1-100), Shuffle, Esc.
+- Background Removal is called BG Removal.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.

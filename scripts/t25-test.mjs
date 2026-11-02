@@ -69,7 +69,7 @@ check(saved().cookies?.["127.0.0.1"] === "none", "asked once: Cancel is remember
 
 // close Hermes mid-download, reopen: it resumes and finishes without duplicates
 await until(async () => pngs().length >= 8, "download started", 120000);
-await until(async () => /· \d+ files ·/.test((await galleryJob(page)).detail ?? ""), "progress shows n files", 20000);
+await until(async () => /· \d+ files ·/.test((await galleryJob(page)).detail ?? ""), "progress shows n new", 20000);
 check(true, `progress without a known total: "${(await galleryJob(page)).detail}"`);
 await page.click("#wc-close").catch(() => {});
 await sleep(2000);

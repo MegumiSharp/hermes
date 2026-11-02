@@ -201,6 +201,9 @@ pub struct Queue {
     backoff_min: i64,
     #[serde(default)]
     paused_all: bool,
+    /// Why the queue waits ("" = a site's rate limit); shown in the cooldown banner.
+    #[serde(default)]
+    pause_reason: String,
 }
 
 static Q: LazyLock<Mutex<Queue>> = LazyLock::new(|| {
@@ -329,7 +332,8 @@ fn pick() -> Vec<String> {
 
 pub(crate) enum Stop {
     Failed(String),
-    RateLimited,
+    /// The site said "slow down" (or e-hentai's quota ran out): requeue, pause, retry later. The text says why.
+    RateLimited(String),
     EagleOffline,
     Cancelled, // user paused or removed it
 }
@@ -421,7 +425,7 @@ async fn run(id: String) {
             }
         };
         let ok = with(|q| {
-            let rate_limited = matches!(result, Err(Stop::RateLimited));
+            let rate_limited = match &result { Err(Stop::RateLimited(why)) => Some(why.clone()), _ => None };
             let Some(j) = job_mut(q, &id) else { return false };
             match result {
                 Ok(found) => {
@@ -440,14 +444,15 @@ async fn run(id: String) {
                     j.state = State::Failed;
                     j.error = e;
                 }
-                Err(Stop::RateLimited) => j.state = State::Queued,
+                Err(Stop::RateLimited(_)) => j.state = State::Queued,
                 Err(Stop::EagleOffline) => j.state = State::WaitingEagle,
                 _ => {}
             }
             j.detail.clear();
-            if rate_limited {
+            if let Some(why) = rate_limited {
                 q.backoff_min = if q.backoff_min == 0 { 1 } else { (q.backoff_min * 2).min(15) }; // 1, 2, 4, 8, 15 min
                 q.paused_until = now_ms() + q.backoff_min * 60_000;
+                q.pause_reason = why;
             }
             false
         });
@@ -550,9 +555,10 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
     let mut files = vec![];
     let mut error_line = String::new(); // last "ERROR: ..." line
     let mut last_line = String::new(); // fallback for tools without an ERROR prefix (ffmpeg)
-    let mut rate_limited = false;
+    let mut rate_limited: Option<String> = None;
     let mut last_tick = 0;
     let mut count = 0u32; // GalleryDl files seen
+    let mut skipped = 0u32; // GalleryDl files already downloaded (archive or on disk)
     // Percent: tools that print one bar per pass (Demucs: "a bag of 4 models" = 4 bars per track) move one bar 0-100%
     let (mut bars, mut pass, mut prev) = (1u32, 0u32, 0f64);
     // only tools that talk to sites can be rate-limited; local ones (Demucs, Whisper, Real-ESRGAN, FFmpeg) never are
@@ -574,8 +580,17 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
             continue;
         }
         let lower = line.to_lowercase();
-        if networked && ["http error 429", "429 too many requests", "sign in to confirm you", "rate-limit", "rate limit"].iter().any(|s| lower.contains(s)) {
-            rate_limited = true;
+        if networked && rate_limited.is_none() {
+            // e-hentai: the image quota or the GP for originals ran out; both come back with time
+            rate_limited = if lower.contains("image limit exceeded") || lower.contains("image limit reached") {
+                Some("E-Hentai image limit reached: it refills over time".into())
+            } else if lower.contains("not enough gp") {
+                Some("Not enough E-Hentai GP for original images: they come back over time".into())
+            } else if ["http error 429", "429 too many requests", "sign in to confirm you", "rate-limit", "rate limit"].iter().any(|s| lower.contains(s)) {
+                Some(String::new())
+            } else {
+                None
+            };
         }
         // console log: everything except progress-bar noise (template ticks, ffmpeg key=value, bare %)
         let noise = line.is_empty()
@@ -615,24 +630,30 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
             }),
             Parser::Plain => (!line.is_empty()).then(|| (0.0, format!("{label} · {line}"))),
             Parser::GalleryDl => {
-                let skipped = line.strip_prefix("# ");
-                let path = skipped.unwrap_or(line);
+                let was_skipped = line.strip_prefix("# ");
+                let path = was_skipped.unwrap_or(line);
                 let b = path.as_bytes();
                 let is_path = b.len() > 3 && b[1] == b':' && b[2] == b'\\';
                 // A skipped file still on disk came from an earlier interrupted run and still needs
                 // its Eagle import; skipped files already imported were deleted, so they don't count.
-                if is_path && (skipped.is_none() || std::path::Path::new(path).exists()) {
+                if is_path && (was_skipped.is_none() || std::path::Path::new(path).exists()) {
                     files.push(path.to_string());
                 }
                 is_path.then(|| {
                     let name = std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
                     count += 1;
+                    if was_skipped.is_some() {
+                        skipped += 1;
+                    }
+                    let new = count - skipped;
+                    // "12 new · 30 already downloaded": re-running a gallery shows what it skips, not a stall
+                    let had = if skipped > 0 { format!(" · {skipped} already downloaded") } else { String::new() };
                     if duration < 0.0 {
                         // total unknown (no preview read): at most |duration| files
-                        return (count as f64 / (-duration).max(count as f64), format!("{label} · {count} file{} · {name}", if count == 1 { "" } else { "s" }));
+                        return (count as f64 / (-duration).max(count as f64), format!("{label} · {new} new{had} · {name}"));
                     }
                     let total = duration.max(count as f64);
-                    (count as f64 / total, format!("{label} {count} / {total:.0} · {name}"))
+                    (count as f64 / total, format!("{label} {count} / {total:.0}{had} · {name}"))
                 })
             }
             Parser::Percent => {
@@ -682,8 +703,12 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
         return Err(Stop::Cancelled);
     }
     // a warning about rate limits in a run that worked (e.g. Hugging Face's "higher rate limits" hint) is not one
-    if rate_limited && !matches!(status, Ok(ref s) if s.success()) {
-        return Err(Stop::RateLimited);
+    if let Some(why) = rate_limited.filter(|_| !matches!(status, Ok(ref s) if s.success())) {
+        return Err(Stop::RateLimited(why));
+    }
+    if parser == Parser::GalleryDl && skipped > 0 {
+        let n = skipped;
+        with(|q| if let Some(j) = job_mut(q, id) { j.note = format!("{n} already downloaded") });
     }
     match status {
         Ok(s) if s.success() => Ok(files),

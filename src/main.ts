@@ -67,7 +67,7 @@ const modules: Module[] = [
     },
   },
   {
-    id: "rembg", name: "Background Removal", icon: "scissors", section: "tools", render: renderRembg,
+    id: "rembg", name: "BG Removal", icon: "scissors", section: "tools", render: renderRembg,
     info: {
       about: "Cuts the subject out of photos (transparent PNG, solid color or cropped). Compare several AI models on the same image and keep the best. Runs on your GPU.",
       formats: "PNG, JPG, WebP, BMP, TIFF in; PNG out. Paste images with Ctrl+V.", engine: "rembg models (BiRefNet, ISNet, U2Net) on ONNX Runtime + DirectML",
@@ -232,7 +232,7 @@ async function renderSettings(view: HTMLElement) {
   el.append(tools);
   el.append(usageCard(version));
   const prefs = h(`<div class="card"><label class="row"><div><div class="v">Show system stats in AI tools</div>
-    <div class="sub">CPU, RAM, GPU load, VRAM and temperature above Background Removal, Upscale, Stem Separation and Subtitles.</div></div>
+    <div class="sub">CPU, RAM, GPU load, VRAM and temperature above BG Removal, Upscale, Stem Separation and Subtitles.</div></div>
     <input type="checkbox" class="switch" id="show-stats"></label></div>`);
   const stats = prefs.querySelector<HTMLInputElement>("#show-stats")!;
   stats.checked = settings.showStats !== false;

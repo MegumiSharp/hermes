@@ -77,18 +77,27 @@ const upload = async (f: File | Blob, name: string) =>
  *  hermes-data/uploads; browsed files keep their real path. Calls `onFiles(paths)`. */
 export function dropZone(
   o: { id: string; label: string; exts: string[]; multiple?: boolean; paste?: boolean },
-  onFiles: (paths: string[]) => void,
+  onFiles: (paths: string[]) => void | Promise<void>,
 ): HTMLElement {
   const el = h(`<div class="drop big" id="${o.id}" tabindex="0">${icon("download")}<span></span>
     <button class="btn sm" type="button" data-browse>${icon("folder")}Browse</button>
     ${o.paste ? `<button class="btn sm" type="button" data-paste title="Paste an image or files (Ctrl+V)">${icon("clipboard")}Paste</button>` : ""}</div>`);
-  el.querySelector("span")!.textContent = o.paste ? `${o.label} or press Ctrl+V` : o.label;
+  const label = o.paste ? `${o.label} or press Ctrl+V` : o.label;
+  el.querySelector("span")!.textContent = label;
   const ok = (name: string) => o.exts.some((e) => lower(name).endsWith(`.${e}`));
+  /** Shows at once that something arrived and is being read (big files take seconds to copy), until the tool has it. */
+  const busy = async (names: string[], work: () => Promise<void>) => {
+    el.classList.add("busy");
+    el.querySelector("span")!.textContent = names.length > 1 ? `Reading ${names.length} files…` : `Reading ${fileName(names[0])}…`;
+    try { await work(); } finally { el.classList.remove("busy"); el.querySelector("span")!.textContent = label; }
+  };
   const take = async (files: { blob: Blob; name: string }[]) => {
     const list = files.filter((f) => ok(f.name)).slice(0, o.multiple ? undefined : 1);
-    const saved = await Promise.all(list.map((f) => upload(f.blob, f.name)));
-    if (saved.length) onFiles(saved);
-    else if (files.length) banner({ id: "drop", tone: "warn", icon: "alert", text: `Unsupported file type. Use ${o.exts.join(", ")}.` });
+    if (!list.length) {
+      if (files.length) banner({ id: "drop", tone: "warn", icon: "alert", text: `Unsupported file type. Use ${o.exts.join(", ")}.` });
+      return;
+    }
+    await busy(list.map((f) => f.name), async () => { await onFiles(await Promise.all(list.map((f) => upload(f.blob, f.name)))); });
   };
   const stamp = () => new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
   el.ondragover = (e) => { e.preventDefault(); el.classList.add("over"); };
@@ -101,7 +110,7 @@ export function dropZone(
   el.querySelector<HTMLButtonElement>("[data-browse]")!.onclick = async () => {
     const picked = await openDialog({ multiple: !!o.multiple, filters: [{ name: "Supported files", extensions: o.exts }] });
     const list = (Array.isArray(picked) ? picked : picked ? [picked] : []).filter(ok);
-    if (list.length) onFiles(list);
+    if (list.length) await busy(list, async () => { await onFiles(list); });
   };
   if (o.paste) {
     // Ctrl+V anywhere on the page: copied files (Explorer) or a copied/screenshotted image

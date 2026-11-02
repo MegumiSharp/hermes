@@ -189,7 +189,7 @@ type ModelStatus = { kind: string; id: string; name: string; installed: string; 
 /** "AI models": are downloaded models / AI packages current? Update runs in the background. */
 function aiModelsCard(): HTMLElement {
   const card = h(`<div class="card" id="ai-models"><div class="row"><div><div class="v"><b>AI models</b></div>
-    <div class="sub">Background Removal models, Whisper models and the AI runtime packages. Checked on demand.</div></div>
+    <div class="sub">BG Removal models, Whisper models and the AI runtime packages. Checked on demand.</div></div>
     <button class="btn sm" id="ai-check">${icon("refresh")}Check models</button></div><div id="ai-rows"></div></div>`);
   const rows = card.querySelector<HTMLElement>("#ai-rows")!;
   const btn = card.querySelector<HTMLButtonElement>("#ai-check")!;

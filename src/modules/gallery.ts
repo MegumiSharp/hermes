@@ -121,7 +121,9 @@ export function renderGallery(view: HTMLElement) {
     const { data } = await paths;
     const config = await invoke<string>("write_job_file", {
       name: `gallery-${Date.now()}.json`,
-      text: JSON.stringify({ extractor: { "image-filter": filterExpr(f) } }),
+      // exhentai gp "stop": out of GP, gallery-dl would quietly switch to resized images; stopping lets the queue
+      // wait and retry for the originals (the queue turns "Not enough GP" / "Image limit" into a timed pause)
+      text: JSON.stringify({ extractor: { "image-filter": filterExpr(f), exhentai: { gp: "stop" } } }),
     });
     const args = [
       "--config", config, "-d", prefs.folder, "--range", `1-${f.limit}`,

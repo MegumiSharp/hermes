@@ -5,7 +5,7 @@ import "@fontsource/roboto/400.css";
 import "@fontsource/roboto/500.css";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { binariesReady } from "../binaries";
-import { clearers, h, memory } from "../core";
+import { banner, clearers, h, memory } from "../core";
 import { icon, IconName } from "../icons";
 import { dropZone, liveStatus } from "./common";
 import { listen } from "@tauri-apps/api/event";
@@ -46,6 +46,10 @@ const since = (ms: number) => {
 const OUTLIER = 3; // views at least 3x the channel's subscribers
 type Channel = { url: string; name: string; avatar: string; subs: number };
 const avatarSize = (url: string) => url.replace(/=s\d+[^/]*$/, "=s88-c-k-c0x00ffffff-no-rj");
+const toVideo = (e: any): Video => ({
+  id: e.id, title: e.title ?? "", channel: e.channel ?? e.uploader ?? "", channelUrl: e.channel_url ?? e.uploader_url ?? "",
+  views: e.view_count ?? 0, duration: e.duration, desc: e.description ?? "", thumb: e.thumbnails.at(-1).url, verified: !!e.channel_is_verified,
+});
 const BLANK = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; // transparent pixel
 const shuffled = <T,>(a: T[]) => a.map((v) => [Math.random(), v] as const).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
 
@@ -104,6 +108,7 @@ export function renderThumbs(view: HTMLElement) {
         <button data-check="outliers" title="Views divided by the channel's subscribers. x3 or more = a video doing far better than its channel">Outliers</button>
       </div>
       <div class="right">
+        <button class="btn sm" id="t-discover" title="A home feed of 100 videos with yours at a random place: would you spot it?">${icon("monitor")}Discover</button>
         <button class="btn sm" id="t-shuffle" title="Shuffle positions">${icon("shuffle")}Shuffle</button>
         <button class="btn sm" id="t-reset" title="Default positions">${icon("retry")}Reset</button>
       </div>
@@ -239,19 +244,17 @@ export function renderThumbs(view: HTMLElement) {
     topic.value = term;
     live.set(`Searching YouTube for "${term}"`);
     $<HTMLButtonElement>("#t-search").disabled = true;
+    renderSkeleton();
     try {
       await binariesReady;
-      const j = await invoke<any>("tool_json", { bin: "yt-dlp.exe", args: ["-J", "--no-warnings", "--encoding", "utf-8", "--flat-playlist", `ytsearch30:${term}`], id: live.stream() });
+      const j = await invoke<any>("tool_json", { bin: "yt-dlp.exe", args: ["-J", "--no-warnings", "--encoding", "utf-8", "--flat-playlist", `ytsearch60:${term}`], id: live.stream() });
       if (id !== searching) return;
-      const videos: Video[] = (j.entries ?? []).filter((e: any) => e.id && e.duration && e.thumbnails?.length).slice(0, 24).map((e: any) => ({
-        id: e.id, title: e.title ?? "", channel: e.channel ?? e.uploader ?? "", channelUrl: e.channel_url ?? e.uploader_url ?? "",
-        views: e.view_count ?? 0, duration: e.duration, desc: e.description ?? "", thumb: e.thumbnails.at(-1).url, verified: !!e.channel_is_verified,
-      }));
+      const videos: Video[] = (j.entries ?? []).filter((e: any) => e.id && e.duration && e.thumbnails?.length).slice(0, 60).map(toVideo);
       Object.assign(state, { videos, order: videos.map((_, i) => i) });
       if (videos.length) live.done(); else live.fail("No videos found, try another search.");
       save(); renderStage(); fetchAvatars(); fetchDates();
     } catch (err) {
-      if (id === searching) live.fail(`Search failed: ${err}`);
+      if (id === searching) { live.fail(`Search failed: ${err}`); renderStage(); }
     } finally {
       if (id === searching) $<HTMLButtonElement>("#t-search").disabled = false;
     }
@@ -265,8 +268,8 @@ export function renderThumbs(view: HTMLElement) {
   $("#t-dice").onclick = randomTopic;
 
   /** Real channel avatars for the feed, fetched progressively and remembered. */
-  function fetchAvatars() {
-    const missing = [...new Set(state.videos.map((v) => v.channelUrl))].filter((u) => u && !(u in state.avatars));
+  function fetchAvatars(videos: Video[] = state.videos) {
+    const missing = [...new Set(videos.map((v) => v.channelUrl))].filter((u) => u && !(u in state.avatars));
     for (const u of missing) {
       avatarQueue = avatarQueue.then(async () => {
         if (u in state.avatars) return;
@@ -278,7 +281,7 @@ export function renderThumbs(view: HTMLElement) {
         } catch { state.avatars[u] = ""; }
         save(true);
         if (state.outliers) renderStage();
-        document.querySelectorAll<HTMLImageElement>(`.yt-av[data-ch="${CSS.escape(u)}"]`).forEach((img) => { if (state.avatars[u]) img.src = state.avatars[u]; });
+        document.querySelectorAll<HTMLImageElement>(`.yt-av[data-ch="${CSS.escape(u)}"]`).forEach((img) => { img.classList.remove("skel"); if (state.avatars[u]) img.src = state.avatars[u]; });
       });
     }
   }
@@ -334,19 +337,25 @@ export function renderThumbs(view: HTMLElement) {
   type Card = { mine: boolean; thumb: string; title: string; channel: string; chUrl: string; avatar: string; meta: string; views: string; age: string; dur: string; desc: string; verified: boolean; watched: number; score?: number };
   function cards(): Card[] {
     const c = state.channel;
-    const others: Card[] = state.order.map((i) => state.videos[i]).filter(Boolean).map((v) => ({
+    const others: Card[] = state.order.map((i) => state.videos[i]).filter(Boolean).map(otherCard);
+    const mine = mineCards(c);
+    const out = [...others];
+    mine.forEach((m, i) => out.splice(Math.min(state.slots[i % state.slots.length] + Math.floor(i / state.slots.length) * 4, out.length), 0, m));
+    return out;
+  }
+  function otherCard(v: Video): Card {
+    return {
       mine: false, thumb: v.thumb, title: v.title, channel: v.channel, chUrl: v.channelUrl, avatar: state.avatars[v.channelUrl] ?? "",
       meta: "", views: `${compact(v.views)} views`, age: state.dates[v.id] ? since(state.dates[v.id]) : ageOf(v.id), dur: clock(v.duration), desc: v.desc, verified: v.verified,
       watched: state.watched && hash(v.id) % 4 === 0 ? 20 + (hash(v.id) % 70) : 0,
       score: state.subs[v.channelUrl] ? v.views / state.subs[v.channelUrl] : undefined,
-    }));
-    const mine: Card[] = state.mine.filter((m) => m.on).map((m) => ({
+    };
+  }
+  function mineCards(c = state.channel): Card[] {
+    return state.mine.filter((m) => m.on).map((m) => ({
       mine: true, thumb: convertFileSrc(m.path), title: m.title || "Your video title", channel: c.name, chUrl: "", avatar: c.avatar,
       meta: "", views: `${state.views || "0"} views`, age: state.age, dur: m.duration, desc: state.desc, verified: false, watched: 0,
     }));
-    const out = [...others];
-    mine.forEach((m, i) => out.splice(Math.min(state.slots[i % state.slots.length] + Math.floor(i / state.slots.length) * 4, out.length), 0, m));
-    return out;
   }
   function cardEl(c: Card, kind: Device): HTMLElement {
     const scored = state.outliers && !c.mine && c.score !== undefined;
@@ -357,7 +366,10 @@ export function renderThumbs(view: HTMLElement) {
         <div class="yt-text"><div class="yt-title"></div>
           ${kind === "search" ? `<div class="yt-meta"></div><div class="yt-chrow"><img class="yt-av" alt="" referrerpolicy="no-referrer"><span class="yt-ch"></span></div><div class="yt-desc"></div>`
             : `<div class="yt-ch"></div><div class="yt-meta"></div>`}</div></div></div>`);
-    el.querySelector<HTMLImageElement>(".yt-thumb img")!.src = c.thumb;
+    const thumb = el.querySelector<HTMLElement>(".yt-thumb")!, timg = thumb.querySelector("img")!;
+    thumb.classList.add("skel");
+    timg.onload = timg.onerror = () => thumb.classList.remove("skel");
+    timg.src = c.thumb;
     el.querySelector(".yt-dur")!.textContent = c.dur;
     el.querySelector(".yt-title")!.textContent = c.title;
     el.querySelector(".yt-ch")!.textContent = c.channel;
@@ -371,6 +383,7 @@ export function renderThumbs(view: HTMLElement) {
     if (av) {
       av.dataset.ch = c.chUrl;
       av.src = c.avatar || BLANK;
+      if (!c.avatar && c.chUrl && !(c.chUrl in state.avatars)) av.classList.add("skel"); // still being fetched
     }
     return el;
   }
@@ -383,11 +396,69 @@ export function renderThumbs(view: HTMLElement) {
       return;
     }
     const d = state.device;
-    const limit = { home: 16, search: 8, sidebar: 12, mobile: 8 }[d];
+    const limit = { home: 48, search: 24, sidebar: 30, mobile: 24 }[d];
     const feed = h(`<div class="yt-feed yt-${d}"></div>`);
     feed.append(...list.slice(0, limit).map((c) => cardEl(c, d)));
     stage.replaceChildren(d === "mobile" ? (() => { const phone = h(`<div class="yt-phone"></div>`); phone.append(feed); return phone; })() : feed);
   }
+  /** Grey shimmering cards while a search runs, shaped like the device's feed. */
+  function renderSkeleton() {
+    if (state.viewMode !== "youtube") return;
+    const d = state.device;
+    const feed = h(`<div class="yt-feed yt-${d} th-skeleton"></div>`);
+    feed.append(...Array.from({ length: { home: 12, search: 4, sidebar: 8, mobile: 4 }[d] }, () =>
+      h(`<div class="yt-card"><div class="yt-thumb skel"></div><div class="yt-info"><span class="yt-av skel"></span><div class="yt-text"><div class="skel-line skel"></div><div class="skel-line short skel"></div></div></div></div>`)));
+    stage.className = `th-stage ${state.dark ? "yt-dark" : "yt-light"}`;
+    stage.replaceChildren(d === "mobile" ? (() => { const phone = h(`<div class="yt-phone"></div>`); phone.append(feed); return phone; })() : feed);
+  }
+
+  // ----- Discover: a home feed of 100 videos, yours at a random place -----
+  const discoverLive = liveStatus("thumbs-discover");
+  async function discover() {
+    if (!mineCards().length) return banner({ id: "thumbs-discover", tone: "warn", icon: "alert", text: "Add a thumbnail first: Discover hides it among 100 videos." });
+    const box = h(`<div class="th-discover ${state.dark ? "yt-dark" : "yt-light"}" role="dialog" aria-label="Discover">
+      <div class="th-disc-bar"><b>Discover</b><span class="sub">Home feed of 100 videos. Can you spot yours?</span>
+        <span class="chip" id="t-disc-pos"></span>
+        <div class="right"><button class="btn sm" id="t-disc-shuffle">${icon("shuffle")}Shuffle</button><button class="btn sm ghost" id="t-disc-close">${icon("x")}Close</button></div></div>
+      <div id="t-disc-live"></div>
+      <div class="th-disc-scroll"><div class="yt-feed yt-home th-disc-feed"></div></div></div>`);
+    const feed = box.querySelector<HTMLElement>(".th-disc-feed")!;
+    const close = () => { box.remove(); removeEventListener("keydown", esc); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    addEventListener("keydown", esc);
+    box.querySelector<HTMLElement>("#t-disc-close")!.onclick = close;
+    box.querySelector("#t-disc-live")!.append(discoverLive.el);
+    document.body.append(box);
+    // 100 videos: the current feed plus more from the same search
+    let pool = state.videos;
+    const draw = () => {
+      const mine = mineCards();
+      const others = shuffled(pool).slice(0, 100 - mine.length).map(otherCard);
+      const spots = shuffled([...Array(others.length + mine.length).keys()]).slice(0, mine.length).sort((a, z) => a - z); // 0-based, 1…100 shown
+      const list = [...others];
+      spots.forEach((at, i) => list.splice(at, 0, mine[i]));
+      feed.replaceChildren(...list.map((c) => cardEl(c, "home")));
+      box.querySelector("#t-disc-pos")!.textContent = `Yours at ${spots.map((x) => `#${x + 1}`).join(", ")} of ${list.length}`;
+      box.querySelector(".th-disc-scroll")!.scrollTop = 0;
+    };
+    box.querySelector<HTMLElement>("#t-disc-shuffle")!.onclick = draw;
+    feed.append(...Array.from({ length: 12 }, () => h(`<div class="yt-card"><div class="yt-thumb skel"></div><div class="yt-info"><span class="yt-av skel"></span><div class="yt-text"><div class="skel-line skel"></div><div class="skel-line short skel"></div></div></div></div>`)));
+    if (state.topic && pool.length < 99) {
+      discoverLive.set(`Finding 100 videos for "${state.topic}"`);
+      try {
+        await binariesReady;
+        const j = await invoke<any>("tool_json", { bin: "yt-dlp.exe", args: ["-J", "--no-warnings", "--encoding", "utf-8", "--flat-playlist", `ytsearch110:${state.topic}`], id: discoverLive.stream() });
+        const more: Video[] = (j.entries ?? []).filter((e: any) => e.id && e.duration && e.thumbnails?.length).map(toVideo);
+        pool = [...new Map([...state.videos, ...more].map((v) => [v.id, v])).values()];
+        discoverLive.done();
+      } catch (err) { discoverLive.fail(`Could not load more videos: ${err}`); }
+    }
+    if (!box.isConnected) return;
+    draw();
+    fetchAvatars(pool);
+  }
+  $("#t-discover").onclick = discover;
+
   function renderSizes() {
     const mine = state.mine.filter((m) => m.on);
     if (!mine.length) {

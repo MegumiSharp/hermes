@@ -27,7 +27,7 @@ export type Job = {
 };
 /** Console lines per job, fetched when a console opens and then appended live. */
 const logs = new Map<string, string[]>();
-type Queue = { jobs: Job[]; pausedUntil: number; backoffMin: number; pausedAll: boolean };
+type Queue = { jobs: Job[]; pausedUntil: number; backoffMin: number; pausedAll: boolean; pauseReason?: string };
 
 let queue: Queue = await invoke("queue_get");
 const views = new Set<{ full: () => void; light: () => void }>();
@@ -281,7 +281,7 @@ export function mountQueue(el: HTMLElement, module?: string) {
     // the rate-limit timer only matters when something of this queue is actually waiting
     const waiting = mine().some((j) => j.state === "queued" && !j.group);
     root.querySelector(".cool")!.innerHTML = waiting && queue.pausedUntil > Date.now()
-      ? `<div class="banner warn">${icon("clock")}<span><b>Rate limited by the site.</b> <span data-until="${queue.pausedUntil}">${countdown(queue.pausedUntil)}</span></span>
+      ? `<div class="banner warn">${icon("clock")}<span><b>${queue.pauseReason || "Rate limited by the site"}.</b> Hermes resumes by itself. <span data-until="${queue.pausedUntil}">${countdown(queue.pausedUntil)}</span></span>
          <div class="acts"><button class="btn sm ghost" data-act="resumeNow">Resume now</button></div></div>`
       : "";
     const list = root.querySelector(".list")!;

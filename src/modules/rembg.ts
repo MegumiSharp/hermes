@@ -124,7 +124,7 @@ async function downloadModels(chosen: Model[]) {
 
 export function renderRembg(view: HTMLElement) {
   const page = h(`<div class="page rembg">
-    <div class="head"><div><h3>Background Removal</h3><div class="sub">rembg models running on your GPU</div></div>
+    <div class="head"><div><h3>BG Removal</h3><div class="sub">rembg models running on your GPU</div></div>
       <div class="right"><button class="btn sm" id="r-models">${icon("layers")}Models</button></div></div>
     <div id="r-stats"></div>
     <div class="notice" id="r-none" hidden>${icon("info")}<span>No model installed yet. Models are downloaded only after you confirm.</span>

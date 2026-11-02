@@ -180,6 +180,11 @@ button.select:hover, select.select:hover { border-color: #3a3a40; }
 .notice .btn { margin-left: auto; }
 .drop.big { flex-direction: row; justify-content: center; padding: 22px; gap: 12px; }
 .drop.big .btn { margin-left: 6px; }
+/* something was dropped and is being read: say so at once (big files take seconds to copy) */
+.drop.busy { border-color: var(--accent); border-style: solid; color: var(--text); background: var(--accent-soft); pointer-events: none; }
+.drop.busy > svg:first-child { color: var(--accent); animation: drop-busy .9s ease-in-out infinite; }
+.drop.busy .btn { opacity: .4; }
+@keyframes drop-busy { 0%, 100% { transform: translateY(-2px); } 50% { transform: translateY(3px); } }
 .file-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .chip.file { color: var(--text); font-family: var(--font); font-size: 12px; padding-right: 4px; }
 .chip.file > span { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
@@ -707,3 +712,23 @@ body[data-anya="corner"] .anya-bubble::before { left: auto; right: -7px; transfo
 #anya-card.off .row:not(:first-child) { opacity: .5; }
 .titlebar .mark { overflow: hidden; } .titlebar .mark img { width: 100%; height: 100%; object-fit: cover; display: block; }
 @media (prefers-reduced-motion: reduce) { .anya .wobble, .anya .shadow, .anya.talking .squish { animation: none !important; } }
+
+/* T27 Thumbnail Tester: skeletons while loading, Discover (100-video home feed) */
+.skel { position: relative; overflow: hidden; background: var(--skel, #2a2a2a) !important; }
+.yt-light .skel, .th-discover.yt-light .skel { --skel: #e5e5e5; }
+.skel::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent); animation: skel 1.3s ease-in-out infinite; }
+.yt-light .skel::after { background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent); }
+@keyframes skel { to { transform: translateX(100%); } }
+.yt-thumb.skel img { opacity: 0; }
+span.yt-av { display: block; }
+.skel-line { height: 14px; border-radius: 4px; margin-top: 6px; width: 90%; }
+.skel-line.short { width: 55%; }
+.th-discover { position: fixed; inset: 36px 0 0 0; z-index: 30; display: flex; flex-direction: column; font-family: Roboto, Arial, sans-serif;
+  --yt-bg: #0f0f0f; --yt-text: #f1f1f1; --yt-muted: #aaa; background: var(--yt-bg); color: var(--yt-text); }
+.th-discover.yt-light { --yt-bg: #fff; --yt-text: #0f0f0f; --yt-muted: #606060; }
+.th-disc-bar { display: flex; align-items: center; gap: 12px; padding: 10px 20px; border-bottom: 1px solid var(--border); background: var(--chrome); color: var(--text); font-family: var(--font); }
+.th-disc-bar .right { margin-left: auto; display: flex; gap: 8px; }
+#t-disc-live { padding: 0 20px; font-family: var(--font); }
+#t-disc-live:empty { display: none; }
+.th-disc-scroll { flex: 1; overflow: auto; padding: 24px; }
+.th-discover .yt-card.mine { outline: none; }
