@@ -36,7 +36,7 @@ const job = (title, seconds, { eagle = false, realtime = false, out } = {}) => (
   eagle: { website: "https://example.com/hermes-test", tags: ["hermes-test", "Test Channel"] },
 });
 
-rmSync(DATA, { recursive: true, force: true });
+rmSync(DATA, { recursive: true, force: true, maxRetries: 20, retryDelay: 500 }); // the previous test's Hermes may still be letting go of its files
 rmSync(WORK, { recursive: true, force: true });
 mkdirSync(DATA, { recursive: true });
 mkdirSync(WORK, { recursive: true });
