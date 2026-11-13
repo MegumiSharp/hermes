@@ -35,7 +35,7 @@ Aggiornato a ogni tranche. Le prove a mano sono in [TEST-TODO.md](TEST-TODO.md),
 | T26 | Gallery senza anteprima: incolli il link e premi **Download**, va subito in coda (pausa/stop lì) con i filtri; cookie per ogni sito, chiesti una sola volta al primo download da quel sito | v0.10.0 |
 | T27 | Gallery: "già scaricati" contati e mostrati, limiti/GP di e-hentai = pausa con timer e motivo, riprende da sola; ogni box di drop mostra subito "Reading…"; Thumbnail Tester: skeleton mentre carica, 60 video, Discover (100 video, la tua thumbnail in un punto a caso); BG Removal | v0.11.0 |
 | T28 | Coda in pausa ("Pause all") ora visibile con banner e Resume all, invece del falso "waiting for a free slot"; Eagle opzionale: domanda al primo avvio, interruttore in Settings | v0.12.0 |
-| T29 | Un solo Hermes alla volta: riaprirlo porta avanti la finestra già aperta (niente download ripartiti); controllo aggiornamenti senza errore "rate limit" anche per FFmpeg, Real-ESRGAN e Tectonic | da pubblicare |
+| T29 | Un solo Hermes alla volta: riaprirlo porta avanti la finestra già aperta (niente download ripartiti); controllo aggiornamenti senza errore "rate limit" anche per FFmpeg, Real-ESRGAN e Tectonic | v0.13.0 |
 
 Provato e scartato: FLAC da SpotiFLAC (server non funzionanti), Mornye (app per telefono, estensioni di terzi).
 FLAC abbandonato per scelta (ottobre 2026).
