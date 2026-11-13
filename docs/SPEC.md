@@ -346,6 +346,13 @@ hermes-data/
 - Eagle is optional: the first launch asks "Do you use Eagle?". No (or closing the question) hides Send to Eagle and the
   Eagle chip in every tool and no job sends to Eagle; Settings → Eagle turns it back on.
 
+## 29. One Hermes at a time, sturdier update checks (T29)
+
+- Opening Hermes while it is already running brings the open window forward instead of starting a second copy
+  (two copies would run the same queue and restart each other's downloads).
+- When GitHub's API limit is reached, update checks read the release pages; this now also works for repositories
+  that moved (FFmpeg builds), tags with special characters (Tectonic) and tools pinned to one version (Real-ESRGAN).
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.

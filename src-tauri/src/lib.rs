@@ -188,6 +188,15 @@ pub fn run() {
     LazyLock::force(&STARTED);
     update::cleanup_old_exe();
     tauri::Builder::default()
+        // one Hermes at a time: a second launch would run the same queue twice (restarting downloads);
+        // instead it brings the open window forward and exits. Must be the first plugin.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(w) = tauri::Manager::get_webview_window(app, "main") {
+                let _ = w.show();
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {

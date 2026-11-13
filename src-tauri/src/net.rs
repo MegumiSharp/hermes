@@ -65,24 +65,37 @@ pub async fn latest_release(api: &str) -> Result<Option<Release>, String> {
 /// API says no, read the latest tag and its date from the release page and the assets from its list.
 async fn latest_from_pages(api: &str) -> Result<Option<Release>, String> {
     let limited = || "Update server rate limit reached, try again later".to_string();
-    let repo = api.strip_prefix("https://api.github.com/repos/").and_then(|r| r.strip_suffix("/releases/latest")).ok_or_else(limited)?;
-    let res = client().get(format!("https://github.com/{repo}/releases/latest")).send().await.map_err(err)?;
+    // ".../repos/<repo>/releases/latest" or a pinned ".../repos/<repo>/releases/tags/<tag>"
+    let rest = api.strip_prefix("https://api.github.com/repos/").ok_or_else(limited)?;
+    let page = if let Some(repo) = rest.strip_suffix("/releases/latest") {
+        format!("https://github.com/{repo}/releases/latest")
+    } else if let Some((repo, tag)) = rest.split_once("/releases/tags/") {
+        format!("https://github.com/{repo}/releases/tag/{tag}")
+    } else {
+        return Err(limited());
+    };
+    let res = client().get(page).send().await.map_err(err)?;
     if res.status() == reqwest::StatusCode::NOT_FOUND {
         return Ok(None);
     }
     let res = res.error_for_status().map_err(|_| limited())?;
-    // redirected to /<repo>/releases/tag/<tag>
-    let Some(tag) = res.url().path().rsplit_once("/releases/tag/").map(|(_, t)| t.to_string()) else { return Ok(None) };
+    // where GitHub really answered: a moved repo (BtbN/FFmpeg-Builds → FFmpeg-Builds/FFmpeg-Builds) redirects,
+    // and the asset links use the new name. Path: /<owner>/<name>/releases/tag/<tag>
+    let path = res.url().path().to_string();
+    let Some((repo, tag)) = path.trim_start_matches('/').split_once("/releases/tag/").map(|(r, t)| (r.to_string(), t.to_string())) else {
+        return Ok(None);
+    };
     let html = res.text().await.map_err(err)?;
     let date = html.split("datetime=\"").nth(1).and_then(|s| s.split('"').next()).unwrap_or_default().to_string();
     let list = client().get(format!("https://github.com/{repo}/releases/expanded_assets/{tag}")).send().await.map_err(err)?;
     let list = list.error_for_status().map_err(|_| limited())?.text().await.map_err(err)?;
-    let prefix = format!("/{repo}/releases/download/{tag}/");
+    // asset links: /<repo>/releases/download/<tag as written, e.g. tectonic%400.17.0>/<name>
+    let prefix = format!("/{repo}/releases/download/");
     let mut assets: Vec<(String, String)> = vec![];
     for href in list.split("href=\"").skip(1).filter_map(|s| s.split('"').next()) {
         // ponytail: names are taken as written in the link (no percent-decoding); fine for these release assets
-        if let Some(name) = href.strip_prefix(&prefix) {
-            if !assets.iter().any(|(n, _)| n == name) {
+        if let Some(name) = href.strip_prefix(&prefix).and_then(|r| r.split_once('/')).map(|(_, n)| n) {
+            if !name.is_empty() && !assets.iter().any(|(n, _)| n == name) {
                 assets.push((name.to_string(), format!("https://github.com{href}")));
             }
         }
@@ -91,6 +104,26 @@ async fn latest_from_pages(api: &str) -> Result<Option<Release>, String> {
         return Err(limited()); // page layout changed: better no answer than a wrong one
     }
     Ok(Some(Release { tag, date, assets }))
+}
+
+#[cfg(test)]
+mod tests {
+    /// Live check of the page fallback (network): latest, a moved repo, an "@" tag and a pinned tag.
+    /// cargo test --release pages -- --ignored
+    #[tokio::test]
+    #[ignore]
+    async fn pages() {
+        for (api, want) in [
+            ("https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest", "yt-dlp.exe"),
+            ("https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest", "win64-gpl"),
+            ("https://api.github.com/repos/tectonic-typesetting/tectonic/releases/latest", "x86_64-pc-windows-msvc.zip"),
+            ("https://api.github.com/repos/xinntao/Real-ESRGAN/releases/tags/v0.2.5.0", "realesrgan-ncnn-vulkan-20220424-windows.zip"),
+        ] {
+            let r = super::latest_from_pages(api).await.unwrap().unwrap();
+            assert!(!r.date.is_empty(), "{api}: no date");
+            assert!(r.assets.iter().any(|(n, _)| n.contains(want)), "{api}: no asset like {want} in {:?}", r.assets.iter().map(|a| &a.0).collect::<Vec<_>>());
+        }
+    }
 }
 
 /// Streams `url` to `dest`, calling `progress(done, total)` per chunk. Fails on a short download.
