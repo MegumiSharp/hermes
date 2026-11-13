@@ -44,7 +44,14 @@ export function folderField(prefs: { folder: string }, save: () => void, id: str
 
 /** "Send to Eagle" checkbox + connection chip. Polls every 5 s while on screen; only reports
  *  "closed" after two failed checks in a row, so a busy Eagle doesn't make it flicker. */
+/** Eagle is optional (Settings, asked on the first launch): when it is off the tools show nothing about it. */
+export const eagleOn = () => settings.eagleEnabled !== false;
+
 export function eagleControls(prefs: { eagle: boolean }, save: () => void, id: string): HTMLElement[] {
+  if (!eagleOn()) {
+    if (prefs.eagle) { prefs.eagle = false; save(); } // a tool never sends to an Eagle the user doesn't use
+    return [];
+  }
   const box = h(`<label class="check"><input type="checkbox" id="${id}"><span class="box">${icon("check")}</span>Send to Eagle<span class="s">Uncategorized</span></label>`);
   const input = box.querySelector("input")!;
   input.checked = prefs.eagle;

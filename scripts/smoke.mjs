@@ -29,12 +29,22 @@ function onSecondScreen(dataDir) {
   writeFileSync(file, JSON.stringify({ ...settings, window: { ...second, width: 1180, height: 760, maximized: false } }));
 }
 
+/** The first-launch "Do you use Eagle?" question: tests answer yes unless they set eagleEnabled themselves. */
+function answerFirstRun(dataDir) {
+  const file = join(dataDir, "settings.json");
+  const settings = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
+  if (settings.eagleEnabled !== undefined) return;
+  mkdirSync(dataDir, { recursive: true });
+  writeFileSync(file, JSON.stringify({ ...settings, eagleEnabled: true }));
+}
+
 /** Starts the exe with a DevTools port and returns { page, proc, errors, close }. */
 export async function launch(exe = DEFAULT_EXE, port = 9333) {
   // a Hermes left running by an aborted test would own WebView2's profile and DevTools port
   try { execSync("taskkill /IM Hermes.exe /F", { stdio: "ignore" }); } catch {}
   await new Promise((r) => setTimeout(r, 500));
   onSecondScreen(join(dirname(exe), "hermes-data"));
+  answerFirstRun(join(dirname(exe), "hermes-data"));
   const proc = spawn(exe, [], {
     env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}` },
     stdio: "ignore",

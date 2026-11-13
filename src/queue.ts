@@ -2,7 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { banner, h, modal } from "./core";
+import { banner, h, modal, settings } from "./core";
 import { icon, IconName } from "./icons";
 
 export type Step =
@@ -113,7 +113,11 @@ function logLine(line: string): HTMLElement {
 const usesEagle = (j: NewJob): boolean => !!j.steps?.some((s) => s.type === "eagle") || !!j.children?.some(usesEagle);
 
 /** Adds jobs; warns right away when Eagle import is requested but Eagle is closed. */
+/** Drops Eagle steps when Eagle is turned off in Settings (no tool shows it then; this covers any leftover choice). */
+const withoutEagle = (j: NewJob): NewJob => ({ ...j, steps: j.steps?.filter((s) => s.type !== "eagle"), children: j.children?.map(withoutEagle) });
+
 export async function addJobs(jobs: NewJob[]): Promise<string[]> {
+  if (settings.eagleEnabled === false) jobs = jobs.map(withoutEagle);
   if (jobs.some(usesEagle) && !(await invoke<boolean>("eagle_status"))) {
     banner({
       id: "eagle-offline", tone: "warn", icon: "alert",
@@ -160,7 +164,7 @@ function statusText(j: Job, state: State): string {
   }
   switch (state) {
     case "running": return j.detail || "Starting";
-    case "queued": return "Queued";
+    case "queued": return queue.pausedAll ? "Queued · queue paused" : queue.pausedUntil > Date.now() ? "Queued · waiting for the cooldown" : "Queued";
     case "paused": return "Paused";
     case "waitingEagle": return "Eagle is closed";
     case "failed": return j.error || "Failed";
@@ -212,7 +216,9 @@ function item(j: Job, showModule: boolean): HTMLElement {
     // terminal-like view of the tool's output: what it is downloading, warnings, server errors
     const c = h(`<div class="console mono" tabindex="0"></div>`);
     const fill = (lines: string[]) => {
-      c.replaceChildren(...(lines.length ? lines.map(logLine) : [logLine(state === "queued" ? "Waiting for a free slot…" : "No output yet")]));
+      // say why it waits: "free slot" only when other jobs really hold every slot
+      const why = queue.pausedAll ? "The whole queue is paused: press Resume all to start." : queue.pausedUntil > Date.now() ? "Waiting for the cooldown to end…" : "Waiting for a free slot…";
+      c.replaceChildren(...(lines.length ? lines.map(logLine) : [logLine(state === "queued" ? why : "No output yet")]));
       requestAnimationFrame(() => (c.scrollTop = c.scrollHeight));
     };
     const cached = logs.get(j.id);
@@ -280,7 +286,11 @@ export function mountQueue(el: HTMLElement, module?: string) {
     root.querySelector(".q-pause")!.innerHTML = queue.pausedAll ? btn("pauseAll", "", "play", "Resume all") : btn("pauseAll", "", "pause", "Pause all");
     // the rate-limit timer only matters when something of this queue is actually waiting
     const waiting = mine().some((j) => j.state === "queued" && !j.group);
-    root.querySelector(".cool")!.innerHTML = waiting && queue.pausedUntil > Date.now()
+    // Pause all is easy to forget: say so wherever something waits because of it
+    root.querySelector(".cool")!.innerHTML = waiting && queue.pausedAll
+      ? `<div class="banner warn">${icon("pause")}<span><b>The queue is paused.</b> Nothing starts until you resume it.</span>
+         <div class="acts"><button class="btn sm" data-act="pauseAll">${icon("play")}Resume all</button></div></div>`
+      : waiting && queue.pausedUntil > Date.now()
       ? `<div class="banner warn">${icon("clock")}<span><b>${queue.pauseReason || "Rate limited by the site"}.</b> Hermes resumes by itself. <span data-until="${queue.pausedUntil}">${countdown(queue.pausedUntil)}</span></span>
          <div class="acts"><button class="btn sm ghost" data-act="resumeNow">Resume now</button></div></div>`
       : "";

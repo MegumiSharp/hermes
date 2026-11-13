@@ -339,6 +339,13 @@ hermes-data/
   shows 48); Discover opens a 100-video home feed with your thumbnail at a random place (1-100), Shuffle, Esc.
 - Background Removal is called BG Removal.
 
+## 28. Paused queue made visible, Eagle optional (T28)
+
+- "Pause all" persists, so a forgotten pause looked like "waiting for a free slot". Now any queue with waiting items
+  shows "The queue is paused" with Resume all, and the items say "Queued · queue paused".
+- Eagle is optional: the first launch asks "Do you use Eagle?". No (or closing the question) hides Send to Eagle and the
+  Eagle chip in every tool and no job sends to Eagle; Settings → Eagle turns it back on.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.

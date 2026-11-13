@@ -231,9 +231,15 @@ async function renderSettings(view: HTMLElement) {
   sortable(tools);
   el.append(tools);
   el.append(usageCard(version));
-  const prefs = h(`<div class="card"><label class="row"><div><div class="v">Show system stats in AI tools</div>
+  const prefs = h(`<div class="card"><label class="row"><div><div class="v">Eagle</div>
+    <div class="sub">Show "Send to Eagle" in the tools, to put downloads and results straight into the Eagle app. Off: everything stays in folders.</div></div>
+    <input type="checkbox" class="switch" id="eagle-enabled"></label>
+    <label class="row"><div><div class="v">Show system stats in AI tools</div>
     <div class="sub">CPU, RAM, GPU load, VRAM and temperature above BG Removal, Upscale, Stem Separation and Subtitles.</div></div>
     <input type="checkbox" class="switch" id="show-stats"></label></div>`);
+  const eagle = prefs.querySelector<HTMLInputElement>("#eagle-enabled")!;
+  eagle.checked = settings.eagleEnabled === true;
+  eagle.onchange = () => saveSettings({ eagleEnabled: eagle.checked });
   const stats = prefs.querySelector<HTMLInputElement>("#show-stats")!;
   stats.checked = settings.showStats !== false;
   stats.onchange = () => saveSettings({ showStats: stats.checked });
@@ -441,5 +447,18 @@ win.onMoved(rememberWindow);
 
 window.addEventListener("hermes:open", (e) => open((e as CustomEvent<string>).detail));
 open(settings.lastModule);
+// Eagle is an option: ask once, on the first launch (or the first after updating to a version that asks)
+if (settings.eagleEnabled == null) { // never answered
+  const body = h(`<div class="first-eagle"><p>Hermes can send what it downloads and makes straight into <b>Eagle</b>, the picture and asset library app.</p>
+    <p class="sub">Don't use Eagle? Everything is saved in normal folders anyway. You can change this any time in Settings.</p></div>`);
+  modal({
+    title: "Do you use Eagle?", body,
+    onClose: () => { if (settings.eagleEnabled == null) saveSettings({ eagleEnabled: false }); }, // closed without answering = no
+    actions: [
+      { label: "No, just folders", run: async () => { await saveSettings({ eagleEnabled: false }); open(current); } },
+      { label: "Yes, I use Eagle", primary: true, run: async () => { await saveSettings({ eagleEnabled: true }); open(current); } },
+    ],
+  });
+}
 startUpdateChecks();
 startBinaryChecks();
