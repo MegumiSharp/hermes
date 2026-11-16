@@ -8,6 +8,9 @@ import { addJobs, mountQueue, NewJob } from "../queue";
 import { fileName, fileTray, folderField, statsBar, stem, TrayItem } from "./common";
 
 type Preset = { label: string; ext: string; audioOnly?: boolean; args: (q: Quality) => string[] };
+/** Container that holds each audio codec as it is (Original audio: stream copy, no re-encoding). */
+const AUDIO_EXT: Record<string, string> = { aac: "m4a", alac: "m4a", mp3: "mp3", opus: "opus", vorbis: "ogg", flac: "flac", ac3: "ac3", eac3: "eac3" };
+const audioExt = (codec: string) => AUDIO_EXT[codec] ?? (codec.startsWith("pcm_") ? "wav" : "mka");
 type Quality = "high" | "balanced" | "small";
 const CQ: Record<Quality, number> = { high: 19, balanced: 24, small: 30 };
 
@@ -22,19 +25,23 @@ const PRESETS: Record<string, Preset> = {
     args: (q) => ["-c:v", "libvpx-vp9", "-crf", String(CQ[q] + 12), "-b:v", "0", "-row-mt", "1", "-c:a", "libopus", "-b:a", "160k"] },
   gif: { label: "GIF · animated, no audio", ext: "gif",
     args: () => ["-vf", "fps=15,split[a][b];[a]palettegen[p];[b][p]paletteuse", "-an"] },
+  audio: { label: "Original audio · as it is, instant, no quality loss", ext: "", audioOnly: true, args: () => ["-vn", "-c:a", "copy"] },
   mp3: { label: "MP3 · audio only, 320 kbps", ext: "mp3", audioOnly: true, args: () => ["-vn", "-c:a", "libmp3lame", "-b:a", "320k"] },
   wav: { label: "WAV · audio only, lossless", ext: "wav", audioOnly: true, args: () => ["-vn", "-c:a", "pcm_s16le"] },
 };
+const escapeHtml = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const HEIGHTS = [0, 720, 1080, 1440, 2160];
 const FPS = [0, 24, 25, 30, 50, 60];
 const EXTS = ["mp4", "mkv", "mov", "webm", "avi", "m4v", "flv", "wmv", "mts", "ts", "gif"];
 
-async function probe(path: string): Promise<{ duration: number; height: number }> {
+async function probe(path: string): Promise<{ duration: number; height: number; audio: string | null }> {
   const j = await invoke<any>("tool_json", {
     bin: "ffprobe.exe",
-    args: ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=height:format=duration", "-of", "json", path],
+    args: ["-v", "error", "-show_entries", "stream=codec_type,codec_name,height:format=duration", "-of", "json", path],
   });
-  return { duration: Number(j.format?.duration) || 0, height: Number(j.streams?.[0]?.height) || 0 };
+  const s: any[] = j.streams ?? [];
+  return { duration: Number(j.format?.duration) || 0, height: Number(s.find((x) => x.codec_type === "video")?.height) || 0,
+    audio: s.find((x) => x.codec_type === "audio")?.codec_name ?? null };
 }
 
 export function renderConverter(view: HTMLElement) {
@@ -72,7 +79,7 @@ export function renderConverter(view: HTMLElement) {
   function hint() {
     const p = PRESETS[state.preset];
     $("#c-video-opts").hidden = !!p.audioOnly;
-    $("#c-hint").textContent = p.audioOnly ? "Extracts the audio track." :
+    $("#c-hint").textContent = p.audioOnly ? state.preset === "audio" ? "Copies the audio track as it is: M4A for AAC, OPUS, MP3, FLAC… No re-encoding, so it takes seconds." : "Extracts the audio track." :
       state.height ? `Resized to ${state.height}p with Lanczos (aspect ratio kept). Enlarging adds no detail: for real detail use Image Upscale on stills.` : "";
   }
 
@@ -87,14 +94,16 @@ export function renderConverter(view: HTMLElement) {
 
   async function job(input: string): Promise<NewJob> {
     const p = PRESETS[state.preset];
-    const { duration } = await probe(input);
+    const { duration, audio } = await probe(input);
+    if (p.audioOnly && !audio) throw new Error(`${fileName(input)} has no audio track`);
+    const ext = p.ext || audioExt(audio!);
     const vf = [state.height && !p.audioOnly ? `scale=-2:${state.height}:flags=lanczos` : "", state.fps && !p.audioOnly ? `fps=${state.fps}` : ""].filter(Boolean);
     const args = p.args(state.quality);
     // GIF already has a -vf chain: prepend ours
     const gifVf = args.indexOf("-vf");
     if (gifVf >= 0 && vf.length) args[gifVf + 1] = `${vf.join(",")},${args[gifVf + 1]}`;
-    const tag = [p.ext.toUpperCase(), state.height ? `${state.height}p` : ""].filter(Boolean).join(" ");
-    const output = `${state.folder}\\${stem(input)} (${tag}).${p.ext}`;
+    const tag = [ext.toUpperCase(), state.height ? `${state.height}p` : ""].filter(Boolean).join(" ");
+    const output = `${state.folder}\\${stem(input)} (${tag}).${ext}`;
     return {
       module: "converter", title: fileName(input), pill: tag, source: input,
       steps: [{
@@ -108,12 +117,13 @@ export function renderConverter(view: HTMLElement) {
     go.disabled = true;
     await binariesReady;
     await invoke("make_dirs", { paths: [state.folder] });
+    // one unreadable video (or one without audio) must not stop the rest of a folder
     const todo = tray.pending();
-    try {
-      tray.assign(todo, await addJobs(await Promise.all(todo.map((it) => job(it.path)))));
-    } catch (e) {
-      banner({ id: "converter", tone: "warn", icon: "alert", text: `Could not read the video: ${e}` });
-    }
+    const res = await Promise.allSettled(todo.map((it) => job(it.path)));
+    const ok = todo.filter((_, i) => res[i].status === "fulfilled");
+    if (ok.length) tray.assign(ok, await addJobs(res.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []))));
+    const bad = res.flatMap((r) => (r.status === "rejected" ? [r.reason instanceof Error ? r.reason.message : String(r.reason)] : []));
+    if (bad.length) banner({ id: "converter", tone: "warn", icon: "alert", text: `Skipped ${bad.length}: ${bad.map(escapeHtml).join("; ")}` });
     update();
   };
 

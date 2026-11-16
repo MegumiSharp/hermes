@@ -353,6 +353,14 @@ hermes-data/
 - When GitHub's API limit is reached, update checks read the release pages; this now also works for repositories
   that moved (FFmpeg builds), tags with special characters (Tectonic) and tools pinned to one version (Real-ESRGAN).
 
+## 30. Audio from local videos, whole folders (T30)
+
+- Video Converter "Original audio": copies each video's audio track as it is (no re-encoding, seconds per file),
+  in the container that fits the codec (AAC → .m4a, Opus → .opus, MP3, FLAC, Vorbis → .ogg, PCM → .wav, others .mka).
+  MP3 320 kbps and WAV stay for a fixed format. A video without audio is skipped with the reason; the others still run.
+- Every multi-file drop zone has a **Folder** button: adds every supported file in a folder, subfolders included.
+  Dropping a folder explains to use the button.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.

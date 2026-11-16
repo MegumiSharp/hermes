@@ -88,6 +88,7 @@ export function dropZone(
 ): HTMLElement {
   const el = h(`<div class="drop big" id="${o.id}" tabindex="0">${icon("download")}<span></span>
     <button class="btn sm" type="button" data-browse>${icon("folder")}Browse</button>
+    ${o.multiple ? `<button class="btn sm" type="button" data-folder title="Add every supported file in a folder, subfolders included">${icon("folder")}Folder</button>` : ""}
     ${o.paste ? `<button class="btn sm" type="button" data-paste title="Paste an image or files (Ctrl+V)">${icon("clipboard")}Paste</button>` : ""}</div>`);
   const label = o.paste ? `${o.label} or press Ctrl+V` : o.label;
   el.querySelector("span")!.textContent = label;
@@ -101,7 +102,8 @@ export function dropZone(
   const take = async (files: { blob: Blob; name: string }[]) => {
     const list = files.filter((f) => ok(f.name)).slice(0, o.multiple ? undefined : 1);
     if (!list.length) {
-      if (files.length) banner({ id: "drop", tone: "warn", icon: "alert", text: `Unsupported file type. Use ${o.exts.join(", ")}.` });
+      if (files.length && o.multiple && files.every((f) => !f.name.includes("."))) banner({ id: "drop", tone: "warn", icon: "alert", text: "Folders can't be dropped. Use the Folder button to add a whole folder." });
+      else if (files.length) banner({ id: "drop", tone: "warn", icon: "alert", text: `Unsupported file type. Use ${o.exts.join(", ")}.` });
       return;
     }
     await busy(list.map((f) => f.name), async () => { await onFiles(await Promise.all(list.map((f) => upload(f.blob, f.name)))); });
@@ -118,6 +120,17 @@ export function dropZone(
     const picked = await openDialog({ multiple: !!o.multiple, filters: [{ name: "Supported files", extensions: o.exts }] });
     const list = (Array.isArray(picked) ? picked : picked ? [picked] : []).filter(ok);
     if (list.length) await busy(list, async () => { await onFiles(list); });
+  };
+  const folderBtn = el.querySelector<HTMLButtonElement>("[data-folder]");
+  if (folderBtn) folderBtn.onclick = async () => {
+    // tests answer the native picker through window.__pickFolder (the Tauri IPC bridge is read-only)
+    const dir = await ((window as any).__pickFolder?.() ?? openDialog({ directory: true }));
+    if (typeof dir !== "string") return;
+    await busy([`${fileName(dir)} folder`], async () => {
+      const list = await invoke<string[]>("list_files", { dir, exts: o.exts.map(lower) });
+      if (list.length) await onFiles(list);
+      else banner({ id: "drop", tone: "warn", icon: "alert", text: `No supported files in that folder (${o.exts.join(", ")}).` });
+    });
   };
   if (o.paste) {
     // Ctrl+V anywhere on the page: copied files (Explorer) or a copied/screenshotted image

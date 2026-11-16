@@ -125,6 +125,25 @@ fn make_dirs(paths: Vec<String>) -> Result<(), String> {
     paths.iter().try_for_each(|p| fs::create_dir_all(p).map_err(|e| e.to_string()))
 }
 
+/// Files under `dir` (subfolders too) whose extension is in `exts` (lowercase, no dot), sorted by path.
+#[tauri::command]
+fn list_files(dir: String, exts: Vec<String>) -> Result<Vec<String>, String> {
+    let mut out = vec![];
+    let mut todo = vec![PathBuf::from(dir)];
+    while let Some(d) = todo.pop() {
+        for e in fs::read_dir(&d).map_err(|e| e.to_string())?.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                todo.push(p);
+            } else if p.extension().and_then(|x| x.to_str()).is_some_and(|x| exts.contains(&x.to_lowercase())) {
+                out.push(p.to_string_lossy().into_owned());
+            }
+        }
+    }
+    out.sort();
+    Ok(out)
+}
+
 /// Stores a file dropped onto the window (HTML5 drop gives bytes, not paths) in hermes-data/uploads.
 /// Raw body = file bytes, header `x-name` = original file name. Returns the saved path.
 #[tauri::command]
@@ -274,6 +293,7 @@ pub fn run() {
             read_file,
             copy_file,
             make_dirs,
+            list_files,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
