@@ -20,6 +20,7 @@ import { renderRembg } from "./modules/rembg";
 import { renderUpscale } from "./modules/upscale";
 import { renderSpotify } from "./modules/spotify";
 import { renderConverter } from "./modules/converter";
+import { renderTwitch } from "./modules/twitch";
 import { renderImgConv } from "./modules/imgconv";
 import { renderDocConv } from "./modules/docconv";
 import { renderPattern } from "./modules/pattern";
@@ -78,6 +79,14 @@ const modules: Module[] = [
     info: {
       about: "Enlarges images 2-4× with AI detail recovery: photo, illustration/anime and fast models. For videos use Video Converter.",
       formats: "PNG, JPG, WebP in; PNG out.", engine: "Real-ESRGAN (ncnn, Vulkan GPU)",
+    },
+  },
+  {
+    id: "twitch", name: "Twitch", icon: "tv", section: "tools", render: renderTwitch,
+    info: {
+      about: "Downloads Twitch VODs fast, or only a part of them (From / To). A channel that is live downloads from the start of the stream while it is still running; an offline channel can be watched and downloaded the moment it goes live. Muted parts are unmuted when possible. The MP4 is H.264 + AAC: Premiere-ready, no conversion.",
+      sources: ["twitch.tv/videos/… (VODs, highlights)", "twitch.tv/<channel> (live, from the start)", "Clips", "Hidden VODs via TwitchTracker, StreamsCharts or SullyGnome links"],
+      engine: "twitch-dlp + Node.js (installed on first use) + FFmpeg", link: "https://github.com/DmitryScaletta/twitch-dlp",
     },
   },
   {

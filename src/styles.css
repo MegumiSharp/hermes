@@ -101,6 +101,7 @@ label.row { cursor: pointer; }
 .field-label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .06em; }
 .field { flex: 1; display: flex; align-items: center; gap: 9px; height: 38px; padding: 0 12px; border: 1px solid var(--border); background: var(--field); border-radius: var(--r); color: var(--muted); min-width: 0; text-align: left; }
 .field:focus-within { border-color: var(--accent-line); }
+.field.bad { border-color: var(--danger); }
 .field input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--text); font: 12px var(--mono); user-select: text; }
 .field input::placeholder { color: var(--muted); font-family: var(--font); font-size: 13px; }
 .field .v { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

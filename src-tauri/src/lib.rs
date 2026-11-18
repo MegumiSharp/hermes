@@ -11,6 +11,7 @@ mod python;
 mod queue;
 mod rembg;
 mod stats;
+mod twitch;
 mod update;
 mod usage;
 mod vector;
@@ -281,6 +282,10 @@ pub fn run() {
             office::office_status,
             office::office_install,
             office::office_remove,
+            twitch::twitch_status,
+            twitch::twitch_latest,
+            twitch::twitch_install,
+            twitch::twitch_remove,
             usage::usage_log,
             usage::usage_read,
             usage::usage_clear,

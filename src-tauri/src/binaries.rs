@@ -49,7 +49,7 @@ fn present(t: &Tool) -> bool {
 }
 
 /// Windows' bsdtar (extracts zip). Git's GNU tar can come first on PATH and can't.
-fn tar() -> std::process::Command {
+pub(crate) fn tar() -> std::process::Command {
     let root = std::env::var_os("SystemRoot").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
     let mut c = std::process::Command::new(root.join(r"System32\tar.exe"));
     c.creation_flags(NO_WINDOW);

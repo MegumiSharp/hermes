@@ -43,6 +43,8 @@ pub enum Parser {
     Percent,
     /// spotDL: counts finished songs ("Downloaded …" / "Skipping …"); `duration` = number of songs.
     SpotDl,
+    /// twitch-dlp: "[download]  14.3% of ~ 28.72MB at 22.79MB/s ETA 00:00:01 (frag 1/7)" (a live keeps adding fragments).
+    Twitch,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -612,6 +614,7 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
         // console log: everything except progress-bar noise (template ticks, ffmpeg key=value, bare %)
         let noise = line.is_empty()
             || line.starts_with("[hermes]")
+            || (parser == Parser::Twitch && line.starts_with("[download]"))
             || (parser == Parser::Ffmpeg && line.contains('=') && !line.contains(' '))
             || (parser == Parser::Percent && percent(line).is_some() && line.len() < 120 && !line.contains(':'));
         if !noise {
@@ -688,6 +691,12 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
                     (total / 100.0, format!("{label} {total:.0}%{of}"))
                 })
             }
+            Parser::Twitch => line.strip_prefix("[download]").and_then(|rest| {
+                let pct = percent(rest.split(" of ").next()?)?;
+                let frag = rest.split("(frag ").nth(1).and_then(|f| f.split(')').next()).map(|f| format!(" · part {f}")).unwrap_or_default();
+                let speed = rest.split(" at ").nth(1).and_then(|s| s.split_whitespace().next()).filter(|s| !s.starts_with("0.00")).map(|s| format!(" · {s}")).unwrap_or_default();
+                Some((pct / 100.0, format!("{label} {pct:.0}%{frag}{speed}")))
+            }),
             Parser::SpotDl => {
                 // songs run in parallel and each takes ~20 s: their stages move the bar, not only finished songs
                 let finished = line.starts_with("Downloaded ") || line.starts_with("Skipping ");

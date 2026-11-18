@@ -6,7 +6,7 @@ import { banner, h, modal, settings } from "./core";
 import { icon, IconName } from "./icons";
 
 export type Step =
-  | { type: "run"; label: string; bin: string; args: string[]; parser: "ytDlp" | "ffmpeg" | "plain" | "galleryDl" | "percent" | "spotDl"; outputs?: string[]; duration?: number; replace?: boolean }
+  | { type: "run"; label: string; bin: string; args: string[]; parser: "ytDlp" | "ffmpeg" | "plain" | "galleryDl" | "percent" | "spotDl" | "twitch"; outputs?: string[]; duration?: number; replace?: boolean }
   | { type: "eagle"; keep?: boolean }
   | { type: "delete"; paths: string[] }
   | { type: "rembg"; model: string; input: string; output: string; background?: string; crop?: boolean; gentle?: boolean }

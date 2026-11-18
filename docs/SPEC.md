@@ -370,6 +370,21 @@ hermes-data/
   in it and downloads them into `<folder>MediaFire`. Files already there are kept. Dead links don't fail the job:
   the note says "n from MediaFire · m MediaFire failed", the console lists the links.
 
+## 32. Twitch (T32)
+
+New tool for fast Twitch downloads (the owner edits a channel), built on twitch-dlp.
+- Links: VODs/highlights, a channel (live: downloaded **from the start of the stream** while it is still live, until
+  it ends), clips, hidden VODs via TwitchTracker / StreamsCharts / SullyGnome links.
+- **From / To** (h:mm:ss, mm:ss or seconds; empty = beginning / end): only that part is downloaded, cut to the nearest
+  ~10 s fragment. The file name gets the range, e.g. "Title [id] (1h25m00-1h40m00).mp4".
+- Quality: Best (source) or the qualities twitch-dlp lists for that link (Check); Audio only.
+- Muted parts: unmute when the best audio is available (default), with any audio, or leave muted.
+- Offline channel: "wait and download when it goes live" (checks every minute, then from the start).
+- Output is MP4 H.264 + AAC: Premiere-ready, no conversion. Interrupted downloads resume (Retry).
+- twitch-dlp is a Node.js script: on the first download Hermes asks, then downloads node.exe (current LTS, from
+  nodejs.org) and twitch-dlp.js into hermes-data/bin/twitch (~35 MB, nothing installed on Windows). twitch-dlp
+  updates itself quietly once per session when a newer release exists.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.
