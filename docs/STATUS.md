@@ -40,7 +40,7 @@ Aggiornato a ogni tranche. Le prove a mano sono in [TEST-TODO.md](TEST-TODO.md),
 | T31 | Gallery: tipo **Archives** (zip, rar, 7z…) nei filtri; i link **MediaFire** scritti nei post (file e cartelle) vengono scaricati in una cartella MediaFire | v0.15.0 |
 | T32 | Nuovo tool **Twitch** (twitch-dlp): VOD veloci, live scaricate dall'inizio mentre sono ancora in onda, clip, VOD nascosti; **From / To** per scaricare solo un pezzo; qualità, smutare le parti mute, aspetta che il canale vada live; MP4 pronto per Premiere | v0.16.0 |
 | T33 | Gallery: i file MediaFire tengono il nome vero (spazi, non "+"); l'avviso pawchive "Incomplete/Missing file import (pending)" diventa una nota "n not on the site yet" (file non ancora copiati dal sito, riprova più tardi). Provato su pawchive con link MediaFire veri | v0.17.0 |
-| T34 | Twitch: scarica anche i **VOD solo-abbonati** (li legge dall'API pubblica e li prende dallo stream pubblico, come l'estensione TwitchNoSub, senza bisogno di abbonamento); li segnala con "Subscriber-only · bypassed" | da pubblicare |
+| T34 | Twitch: scarica anche i **VOD solo-abbonati** (li legge dall'API pubblica e li prende dallo stream pubblico, come l'estensione TwitchNoSub, senza bisogno di abbonamento); li segnala con "Subscriber-only · bypassed" | v0.18.0 |
 
 Provato e scartato: FLAC da SpotiFLAC (server non funzionanti), Mornye (app per telefono, estensioni di terzi).
 FLAC abbandonato per scelta (ottobre 2026).
