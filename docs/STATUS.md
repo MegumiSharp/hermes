@@ -39,6 +39,7 @@ Aggiornato a ogni tranche. Le prove a mano sono in [TEST-TODO.md](TEST-TODO.md),
 | T30 | Audio dai video sul PC: Video Converter "Original audio" (copia la traccia così com'è, istantaneo, senza perdita) + MP3/WAV; pulsante **Folder** in ogni zona di trascinamento per aggiungere una cartella intera (anche sottocartelle) | v0.14.0 |
 | T31 | Gallery: tipo **Archives** (zip, rar, 7z…) nei filtri; i link **MediaFire** scritti nei post (file e cartelle) vengono scaricati in una cartella MediaFire | v0.15.0 |
 | T32 | Nuovo tool **Twitch** (twitch-dlp): VOD veloci, live scaricate dall'inizio mentre sono ancora in onda, clip, VOD nascosti; **From / To** per scaricare solo un pezzo; qualità, smutare le parti mute, aspetta che il canale vada live; MP4 pronto per Premiere | v0.16.0 |
+| T33 | Gallery: i file MediaFire tengono il nome vero (spazi, non "+"); l'avviso pawchive "Incomplete/Missing file import (pending)" diventa una nota "n not on the site yet" (file non ancora copiati dal sito, riprova più tardi). Provato su pawchive con link MediaFire veri | da pubblicare |
 
 Provato e scartato: FLAC da SpotiFLAC (server non funzionanti), Mornye (app per telefono, estensioni di terzi).
 FLAC abbandonato per scelta (ottobre 2026).

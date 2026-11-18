@@ -578,6 +578,7 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
     let mut last_tick = 0;
     let mut count = 0u32; // GalleryDl files seen
     let mut skipped = 0u32; // GalleryDl files already downloaded (archive or on disk)
+    let mut pending = 0u32; // GalleryDl files the site lists but hasn't imported yet (kemono mirrors)
     // Percent: tools that print one bar per pass (Demucs: "a bag of 4 models" = 4 bars per track) move one bar 0-100%
     let (mut bars, mut pass, mut prev) = (1u32, 0u32, 0f64);
     // only tools that talk to sites can be rate-limited; local ones (Demucs, Whisper, Real-ESRGAN, FFmpeg) never are
@@ -594,6 +595,9 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
         let Some(line) = line else { continue };
         let line = String::from_utf8_lossy(&line);
         let line = line.trim();
+        if parser == Parser::GalleryDl && line.contains("Incomplete/Missing file import") {
+            pending += 1;
+        }
         if let Some(f) = line.strip_prefix("[file] ") {
             files.push(f.to_string());
             continue;
@@ -732,9 +736,11 @@ pub(crate) async fn run_tool(id: &str, label: &str, bin: &str, args: &[String], 
     if let Some(why) = rate_limited.filter(|_| !matches!(status, Ok(ref s) if s.success())) {
         return Err(Stop::RateLimited(why));
     }
-    if parser == Parser::GalleryDl && skipped > 0 {
-        let n = skipped;
-        with(|q| if let Some(j) = job_mut(q, id) { j.note = format!("{n} already downloaded") });
+    if parser == Parser::GalleryDl && (skipped > 0 || pending > 0) {
+        // kemono mirrors (pawchive…): "Incomplete/Missing file import" = the site hasn't copied that file yet
+        let note = [(skipped > 0).then(|| format!("{skipped} already downloaded")), (pending > 0).then(|| format!("{pending} not on the site yet (try again later)"))];
+        let note = note.into_iter().flatten().collect::<Vec<_>>().join(" · ");
+        with(|q| if let Some(j) = job_mut(q, id) { j.note = note });
     }
     match status {
         Ok(s) if s.success() => Ok(files),

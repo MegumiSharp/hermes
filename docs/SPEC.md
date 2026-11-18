@@ -369,6 +369,9 @@ hermes-data/
   after the download (and after Eagle, so packs never go to Eagle) Hermes finds mediafire.com file and folder links
   in it and downloads them into `<folder>MediaFire`. Files already there are kept. Dead links don't fail the job:
   the note says "n from MediaFire · m MediaFire failed", the console lists the links.
+- (T33) MediaFire files keep their real name (the direct link writes spaces as "+"). Kemono mirrors such as
+  pawchive warn "Incomplete/Missing file import ('pending')" for files they haven't copied yet: the job note counts
+  them ("n not on the site yet (try again later)"); a later run with Skip already downloaded picks them up.
 
 ## 32. Twitch (T32)
 

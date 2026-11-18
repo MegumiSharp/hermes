@@ -75,12 +75,18 @@ async fn folder_files(key: &str, depth: u8) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
+/// The real file name from a direct link: its last segment, form-encoded ("Peach+Reindeer+0.rar" = spaces).
+fn file_name(url: &str) -> String {
+    let last = url.rsplit('/').next().unwrap_or("download").split('?').next().unwrap_or("download");
+    crate::urlencoding_decode(&last.replace('+', " "))
+}
+
 /// Downloads one MediaFire file page into `dir`; returns the saved path (an existing file of the same
 /// name is kept, not downloaded again).
 async fn file(page: &str, dir: &Path, progress: &mut impl FnMut(u64, u64)) -> Result<String, String> {
     let html = client().get(page).header("User-Agent", "Mozilla/5.0").send().await.map_err(err)?.text().await.map_err(err)?;
     let url = direct_link(&html).ok_or("no download button (file removed or private?)")?;
-    let name = crate::urlencoding_decode(url.rsplit('/').next().unwrap_or("download").split('?').next().unwrap_or("download"));
+    let name = file_name(&url);
     let name: String = name.chars().map(|c| if r#"\/:*?"<>|"#.contains(c) { '_' } else { c }).collect();
     let dest = dir.join(&name);
     if dest.metadata().is_ok_and(|m| m.len() > 0) {
@@ -140,6 +146,12 @@ mod tests {
             "https://mediafire.com/folder/xyz789",
             "http://www.mediafire.com/?k3y4b",
         ]);
+    }
+
+    #[test]
+    fn names() {
+        assert_eq!(file_name("https://download2.mediafire.com/x/k/Peach+Reindeer+0.rar"), "Peach Reindeer 0.rar");
+        assert_eq!(file_name("https://download2.mediafire.com/x/k/a%2Bb%20c.zip?dkey=1"), "a+b c.zip");
     }
 
     #[test]
