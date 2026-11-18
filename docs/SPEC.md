@@ -375,6 +375,14 @@ hermes-data/
 
 ## 32. Twitch (T32)
 
+- (T34) **Subscriber-only VODs**: the owner edits for a creator whose VODs are sub-only and asked to download
+  them. Twitch's VOD metadata (title, length, thumbnail) is public, and the video segments stay on the public CDN
+  even when the stream is sub-gated — the same thing the TwitchNoSub extension relies on, already built into
+  twitch-dlp (it falls back to the thumbnail-derived CDN playlist). Hermes reads the metadata through the public
+  GraphQL API (`twitch_meta`) instead of yt-dlp (which can't open sub-only VODs), detects a gated VOD by probing
+  the signed manifest, and labels it "Subscriber-only · bypassed" when a public CDN copy exists (or warns when it
+  doesn't). The download is unchanged — twitch-dlp pulls it from the CDN, no subscription needed.
+
 New tool for fast Twitch downloads (the owner edits a channel), built on twitch-dlp.
 - Links: VODs/highlights, a channel (live: downloaded **from the start of the stream** while it is still live, until
   it ends), clips, hidden VODs via TwitchTracker / StreamsCharts / SullyGnome links.

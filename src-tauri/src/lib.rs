@@ -286,6 +286,7 @@ pub fn run() {
             twitch::twitch_latest,
             twitch::twitch_install,
             twitch::twitch_remove,
+            twitch::twitch_meta,
             usage::usage_log,
             usage::usage_read,
             usage::usage_clear,

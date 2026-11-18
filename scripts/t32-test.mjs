@@ -44,6 +44,11 @@ let app = await launch(EXE);
 let { page } = app;
 const invoke = (cmd, args = {}) => page.evaluate(([c, a]) => window.__TAURI_INTERNALS__.invoke(c, a), [cmd, args]);
 await page.waitForSelector("#tw-url");
+// metadata comes from the public GraphQL API (reads subscriber-only VODs too, which yt-dlp can't)
+const meta = await invoke("twitch_meta", { url: vod });
+check(meta.kind === "vod" && meta.title && meta.duration > 0 && meta.downloadable, `twitch_meta reads a VOD: "${meta.title?.slice(0, 40)}" (${meta.duration}s, downloadable ${meta.downloadable}, subOnly ${meta.subOnly})`);
+const chMeta = await invoke("twitch_meta", { url: "https://www.twitch.tv/zackrawrr" });
+check(chMeta.kind === "channel" && typeof chMeta.live === "boolean", "twitch_meta reads a channel (live state)");
 check(await page.isDisabled("#tw-add"), "Download disabled without a Twitch link");
 await page.fill("#tw-url", "https://www.youtube.com/watch?v=x");
 check(await page.isDisabled("#tw-add"), "a YouTube link is refused");

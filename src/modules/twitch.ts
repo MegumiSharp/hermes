@@ -13,7 +13,8 @@ import { folderField, liveStatus } from "./common";
 import { parseTime, sectionArg, sectionTag, twitchKind } from "./twitch-core";
 
 type Status = { installed: boolean; version: string; node: string; script: string };
-type Info = { title: string; channel: string; thumb: string; duration: number; live: boolean; offline: boolean; formats: string[] };
+type Meta = { kind: string; id: string; title: string; channel: string; thumb: string; duration: number; live: boolean; offline: boolean; subOnly: boolean; downloadable: boolean };
+type Info = Meta & { formats: string[] };
 
 const state = memory("twitch", { url: "", folder: "", quality: "best", from: "", to: "", unmute: "quality", wait: true });
 let info: Info | null = null;
@@ -62,7 +63,7 @@ export function renderTwitch(view: HTMLElement) {
   const p = state.state;
   const page = h(`<div class="page twitch">
     <div class="head">
-      <div><h3>Twitch</h3><div class="sub">VODs, lives from the start, clips and hidden VODs. MP4 ready for Premiere, no conversion.</div></div>
+      <div><h3>Twitch</h3><div class="sub">VODs (subscriber-only too), lives from the start, clips and hidden VODs. MP4 ready for Premiere, no conversion.</div></div>
       <div class="right"><span class="chip" id="tw-tool"><span class="dot"></span>twitch-dlp</span></div>
     </div>
     <form class="url" id="tw-form">
@@ -118,43 +119,41 @@ export function renderTwitch(view: HTMLElement) {
   function sync() {
     const kind = twitchKind(urlInput.value.trim());
     $("#tw-wait-box").hidden = kind !== "channel";
-    addBtn.disabled = !kind || !renderRange();
+    const checkedThis = info && infoUrl === urlInput.value.trim();
+    const notDownloadable = checkedThis && info!.subOnly && !info!.downloadable;
+    addBtn.disabled = !kind || !renderRange() || !!notDownloadable;
   }
   function renderPreview() {
     const pv = $("#tw-preview");
     pv.hidden = !info;
     if (!info) return;
-    const badge = info.offline ? `<span class="chip">Offline</span>` : info.live ? `<span class="chip bad">LIVE</span>` : "";
+    const badge = info.offline ? `<span class="chip">Offline</span>` : info.live ? `<span class="chip bad">LIVE</span>`
+      : info.subOnly ? `<span class="chip" title="The VOD is subscriber-only, but Hermes downloads it from the public stream — no subscription needed">Subscriber-only · bypassed</span>` : "";
+    const warn = info.subOnly && !info.downloadable ? `<span class="chip bad">No public stream found</span>` : "";
     pv.innerHTML = `<div class="thumb">${info.thumb ? `<img src="${esc(info.thumb)}" alt="">` : ""}${info.duration && !info.live ? `<span class="dur">${clock(info.duration)}</span>` : ""}</div>
-      <div class="meta"><div class="t">${esc(info.title)}</div><div class="c">${esc(info.channel)}</div><div class="facts">${badge}</div></div>`;
+      <div class="meta"><div class="t">${esc(info.title || (info.kind === "clip" ? "Clip" : "Twitch VOD"))}</div><div class="c">${esc(info.channel)}</div><div class="facts">${badge}${warn}</div></div>`;
   }
 
-  /** Title, length and qualities (yt-dlp for the metadata, twitch-dlp -F for the formats it can pick). */
+  /** Title, length and qualities: public GraphQL for the metadata (reads subscriber-only VODs too),
+   *  twitch-dlp -F for the exact formats it can pick once installed. */
   async function check() {
     const url = urlInput.value.trim();
-    if (!twitchKind(url)) return;
     const kind = twitchKind(url);
+    if (!kind) return;
     live.set("Reading the Twitch link");
     await binariesReady;
     try {
-      const meta = kind === "tracker" ? null : await invoke<any>("tool_json", { bin: "yt-dlp.exe", args: ["-J", "--no-playlist", "--skip-download", url], id: live.stream() }).catch((e) => {
-        if (kind === "channel" && /not currently live|offline/i.test(String(e))) return { offline: true };
-        throw e;
-      });
+      const meta = await invoke<Meta>("twitch_meta", { url });
       let formats: string[] = [];
       const s = await invoke<Status>("twitch_status");
-      if (s.installed && !meta?.offline) {
+      if (s.installed && meta.downloadable && kind !== "channel") {
         const out = await invoke<string>("tool_text", { bin: s.node, args: [s.script, url, "-F"] }).catch(() => "");
         formats = [...out.matchAll(/'(\d+p\d*|Audio_Only)'/g)].map((m) => m[1]).reverse();
       }
-      const channel = url.match(/twitch\.tv\/([^/?#]+)/)?.[1] ?? "";
-      info = {
-        title: meta?.offline ? `${channel} is offline` : meta?.title ?? meta?.description ?? "Hidden VOD",
-        channel: meta?.uploader ?? meta?.channel ?? channel,
-        thumb: meta?.thumbnail ?? "", duration: Number(meta?.duration) || 0, live: !!meta?.is_live, offline: !!meta?.offline, formats,
-      };
+      info = { ...meta, formats };
       infoUrl = url;
-      live.done();
+      if (meta.subOnly && !meta.downloadable) live.fail("This VOD is subscriber-only and no public copy is on Twitch's servers, so it can't be downloaded.");
+      else live.done();
     } catch (e) {
       info = null;
       live.fail(`Could not read this link: ${String(e).replace(/^ERROR: /, "")}`);
@@ -198,12 +197,14 @@ export function renderTwitch(view: HTMLElement) {
       args.push("--live-from-start");
       if (p.wait) args.push("--retry-streams", "60");
     }
+    const subOnly = kind === "vod" && info?.subOnly && infoUrl === url;
     const waiting = kind === "channel" && p.wait && info?.offline;
     await addJobs([{
-      module: "twitch", title: base, pill: kind === "channel" ? "LIVE" : kind === "clip" ? "Clip" : "VOD",
+      module: "twitch", title: base, pill: kind === "channel" ? "LIVE" : kind === "clip" ? "Clip" : subOnly ? "Sub-only" : "VOD",
       steps: [{ type: "run", label: waiting ? "Waiting for the stream, then downloading" : "Downloading", bin: s.node, parser: "twitch", args, outputs: [output] }],
     }]);
-    banner({ id: "twitch-added", icon: "check", text: kind === "channel" ? "Live download started from the beginning of the stream. It keeps going until the stream ends; stop it any time in the queue." : "Download started in the queue below." });
+    banner({ id: "twitch-added", icon: "check", text: kind === "channel" ? "Live download started from the beginning of the stream. It keeps going until the stream ends; stop it any time in the queue."
+      : subOnly ? "Subscriber-only VOD: downloading from Twitch's public stream, no subscription needed." : "Download started in the queue below." });
   };
 
   renderQuality();

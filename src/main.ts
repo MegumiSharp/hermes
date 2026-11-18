@@ -84,8 +84,8 @@ const modules: Module[] = [
   {
     id: "twitch", name: "Twitch", icon: "tv", section: "tools", render: renderTwitch,
     info: {
-      about: "Downloads Twitch VODs fast, or only a part of them (From / To). A channel that is live downloads from the start of the stream while it is still running; an offline channel can be watched and downloaded the moment it goes live. Muted parts are unmuted when possible. The MP4 is H.264 + AAC: Premiere-ready, no conversion.",
-      sources: ["twitch.tv/videos/… (VODs, highlights)", "twitch.tv/<channel> (live, from the start)", "Clips", "Hidden VODs via TwitchTracker, StreamsCharts or SullyGnome links"],
+      about: "Downloads Twitch VODs fast (subscriber-only ones too, from the public stream), or only a part of them (From / To). A channel that is live downloads from the start of the stream while it is still running; an offline channel can be watched and downloaded the moment it goes live. Muted parts are unmuted when possible. The MP4 is H.264 + AAC: Premiere-ready, no conversion.",
+      sources: ["twitch.tv/videos/… (VODs, highlights)", "Subscriber-only VODs (downloaded from Twitch's public stream, no subscription needed)", "twitch.tv/<channel> (live, from the start)", "Clips", "Hidden VODs via TwitchTracker, StreamsCharts or SullyGnome links"],
       engine: "twitch-dlp + Node.js (installed on first use) + FFmpeg", link: "https://github.com/DmitryScaletta/twitch-dlp",
     },
   },
