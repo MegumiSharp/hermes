@@ -15,8 +15,8 @@ import { Filters, filterExpr, Kind } from "./gallery-filter";
 type Prefs = { folder: string; eagle: boolean; filters: Filters; url: string };
 
 const DEFAULT_FILTERS: Filters = {
-  types: { image: true, video: true, gif: true }, extOff: [], minW: 0, minH: 0,
-  sizeMin: 0, sizeMax: 0, dateFrom: "", dateTo: "", limit: 1000, skipDownloaded: true, titleHas: "", titleNot: "",
+  types: { image: true, video: true, gif: true, archive: true }, extOff: [], minW: 0, minH: 0,
+  sizeMin: 0, sizeMax: 0, dateFrom: "", dateTo: "", limit: 1000, skipDownloaded: true, mediafire: true, titleHas: "", titleNot: "",
 };
 
 export function renderGallery(view: HTMLElement) {
@@ -73,7 +73,8 @@ export function renderGallery(view: HTMLElement) {
       <div class="f-group"><div class="field-label">Title excludes</div>
         <input type="text" data-text="titleNot" placeholder="e.g. ad, promo"></div>
       <div class="f-group"><div class="field-label">Media type</div>
-        ${(["image", "video", "gif"] as Kind[]).map((k) => `<label class="f-check"><input type="checkbox" data-type="${k}" ${f.types[k] ? "checked" : ""}>${k === "gif" ? "GIFs" : k === "image" ? "Images" : "Videos"}</label>`).join("")}</div>
+        ${(["image", "video", "gif", "archive"] as Kind[]).map((k) => `<label class="f-check"${k === "archive" ? ' title="zip, rar, 7z and other archives hosted on the site"' : ""}><input type="checkbox" data-type="${k}" ${f.types[k] ? "checked" : ""}>${({ gif: "GIFs", image: "Images", video: "Videos", archive: "Archives" })[k]}</label>`).join("")}
+        <label class="f-check" title="MediaFire file or folder links written in the posts are downloaded too, into a MediaFire folder"><input type="checkbox" data-bool="mediafire" ${f.mediafire ? "checked" : ""}>MediaFire links in posts</label></div>
       <div class="f-group"><div class="field-label">Skip extensions</div>
         <input type="text" data-ext placeholder="e.g. webp, zip"></div>
       <div class="f-group"><div class="field-label">Minimum resolution</div>
@@ -119,11 +120,15 @@ export function renderGallery(view: HTMLElement) {
     await binariesReady;
     const f = prefs.filters;
     const { data } = await paths;
+    const stamp = Date.now();
+    const posts = `gallery-${stamp}-posts.jsonl`;
     const config = await invoke<string>("write_job_file", {
-      name: `gallery-${Date.now()}.json`,
+      name: `gallery-${stamp}.json`,
       // exhentai gp "stop": out of GP, gallery-dl would quietly switch to resized images; stopping lets the queue
       // wait and retry for the originals (the queue turns "Not enough GP" / "Image limit" into a timed pause)
-      text: JSON.stringify({ extractor: { "image-filter": filterExpr(f), exhentai: { gp: "stop" } } }),
+      // MediaFire: each post's metadata (text, embeds, attachments) goes to a JSON-lines file the next step scans
+      text: JSON.stringify({ extractor: { "image-filter": filterExpr(f), exhentai: { gp: "stop" },
+        ...(f.mediafire ? { postprocessors: [{ name: "metadata", event: "post", mode: "jsonl", "base-directory": `${data}\\jobs`, directory: [], filename: posts, open: "a" }] } : {}) } }),
     });
     const args = [
       "--config", config, "-d", prefs.folder, "--range", `1-${f.limit}`,
@@ -135,6 +140,8 @@ export function renderGallery(view: HTMLElement) {
     // duration < 0: the total is unknown, at most |duration| files (the queue shows "n files")
     const steps: Step[] = [{ type: "run", label: "Downloading", bin: "gallery-dl.exe", parser: "galleryDl", duration: -f.limit, args }];
     if (prefs.eagle) steps.push({ type: "eagle" });
+    // after Eagle: MediaFire packs (rar, zip…) stay in the folder, Eagle gets only the gallery's media
+    if (f.mediafire) steps.push({ type: "mediafire", posts: `${data}\\jobs\\${posts}`, folder: prefs.folder });
     const path = url.replace(/^https?:\/\/[^/]+\/?/, "").slice(0, 60);
     await addJobs([{ module: "gallery", title: path ? `${s} · ${path}` : s, pill: s, steps, eagle: { website: url, tags: [url] } }]);
     banner({ id: "gallery-added", icon: "check", text: "Download started. Pause or stop it in the queue below; closing Hermes resumes it next time." });

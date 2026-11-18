@@ -361,6 +361,15 @@ hermes-data/
 - Every multi-file drop zone has a **Folder** button: adds every supported file in a folder, subfolders included.
   Dropping a folder explains to use the button.
 
+## 31. Archives and MediaFire links in Gallery (T31)
+
+- Gallery filters: a fourth type **Archives** (zip, rar, 7z, tar, gz, cbz, cbr…). Archives no longer count as
+  images, so "only Archives" = Images, Videos and GIFs off.
+- **MediaFire links in posts** (on by default): gallery-dl saves each post's metadata (text, embeds, attachments);
+  after the download (and after Eagle, so packs never go to Eagle) Hermes finds mediafire.com file and folder links
+  in it and downloads them into `<folder>MediaFire`. Files already there are kept. Dead links don't fail the job:
+  the note says "n from MediaFire · m MediaFire failed", the console lists the links.
+
 ## 9. Delivery tranches
 
 Each tranche ends with a working, committed build. Later tranches never require reworking earlier ones.

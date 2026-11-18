@@ -3,6 +3,7 @@ mod binaries;
 mod cookies;
 mod eagle;
 mod lyrics;
+mod mediafire;
 mod models;
 mod net;
 mod office;
@@ -184,7 +185,7 @@ fn read_file(path: String) -> Result<tauri::ipc::Response, String> {
 }
 
 /// Header values are ASCII; the frontend sends the name with encodeURIComponent.
-fn urlencoding_decode(s: &str) -> String {
+pub(crate) fn urlencoding_decode(s: &str) -> String {
     let b = s.as_bytes();
     let mut out = Vec::with_capacity(b.len());
     let mut i = 0;

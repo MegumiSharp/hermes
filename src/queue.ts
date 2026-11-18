@@ -12,7 +12,8 @@ export type Step =
   | { type: "rembg"; model: string; input: string; output: string; background?: string; crop?: boolean; gentle?: boolean }
   | { type: "vectorize"; input: string; output: string; mode: string; detail: string }
   | { type: "audible"; asin: string; title: string; author: string; duration: number; folder: string }
-  | { type: "lyrics"; prefer?: string[] };
+  | { type: "lyrics"; prefer?: string[] }
+  | { type: "mediafire"; posts: string; folder: string };
 export type EagleMeta = { website?: string; tags?: string[]; annotation?: string };
 export type NewJob = {
   module: string; title: string; pill?: string; steps?: Step[]; eagle?: EagleMeta; children?: NewJob[];

@@ -91,6 +91,9 @@ pub enum Step {
         #[serde(default)]
         prefer: Vec<String>,
     },
+    /// MediaFire links in the posts gallery-dl saved to `posts` (JSON lines) into `<folder>\MediaFire` (mediafire.rs).
+    /// Never fails the job: dead links are listed in the console and the note.
+    Mediafire { posts: String, folder: String },
     /// Raster image to SVG in process (vector.rs). `mode` color|bw, `detail` high|balanced|simple.
     Vectorize {
         input: String,
@@ -393,6 +396,20 @@ async fn run(id: String) {
                     j.note = note;
                 }
                 Ok(vec![])
+            }
+            Step::Mediafire { posts, folder } => {
+                tick(&id, 0.0, "Looking for MediaFire links".into());
+                let (saved, failed) = crate::mediafire::download_all(&posts, &folder, |p, d| tick(&id, p, d)).await;
+                for f in &failed {
+                    log_line(&id, &format!("MediaFire failed: {f}"));
+                }
+                if !saved.is_empty() || !failed.is_empty() {
+                    let note = [(!saved.is_empty()).then(|| format!("{} from MediaFire", saved.len())), (!failed.is_empty()).then(|| format!("{} MediaFire failed", failed.len()))];
+                    if let Some(j) = job_mut(&mut lock(), &id) {
+                        j.note = [j.note.clone()].into_iter().filter(|n| !n.is_empty()).chain(note.into_iter().flatten()).collect::<Vec<_>>().join(" · ");
+                    }
+                }
+                Ok(saved)
             }
             Step::Vectorize { input, output, mode, detail } => {
                 let last = job.outputs.last().cloned().unwrap_or_default();

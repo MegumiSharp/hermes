@@ -2,16 +2,18 @@
 // runs in a single pass over the whole URL (Hermes only reads a preview). Missing metadata always passes:
 // not every site reports sizes, dates or titles. Checked against real gallery-dl by scripts/gallery-filter-test.mjs.
 
-export type Kind = "image" | "video" | "gif";
+export type Kind = "image" | "video" | "gif" | "archive";
 export type Filters = {
   types: Record<Kind, boolean>; extOff: string[]; minW: number; minH: number;
   sizeMin: number; sizeMax: number; dateFrom: string; dateTo: string; limit: number; skipDownloaded: boolean;
+  mediafire: boolean; // also download MediaFire links found in the posts (mediafire.rs)
   titleHas: string; titleNot: string; // comma-separated words matched against title/description and the file name
 };
 export const VIDEO = ["mp4", "webm", "mov", "mkv", "m4v", "avi"];
+export const ARCHIVE = ["zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "cbz", "cbr"];
 export const TEXT_KEYS = ["title", "description", "content", "caption", "text", "summary"];
 export const words = (s: string) => s.split(",").map((w) => w.trim().toLowerCase()).filter(Boolean);
-export const kindOf = (ext: string): Kind => (ext === "gif" ? "gif" : VIDEO.includes(ext) ? "video" : "image");
+export const kindOf = (ext: string): Kind => (ext === "gif" ? "gif" : VIDEO.includes(ext) ? "video" : ARCHIVE.includes(ext) ? "archive" : "image");
 
 const py = (s: string) => JSON.stringify(s); // a JSON string is a valid Python string literal
 const set = (xs: string[]) => `{${xs.map(py).join(", ")}}`;
@@ -27,9 +29,10 @@ const day = (d: string, plus = 0) => {
 
 export function filterExpr(f: Filters, offKeys: string[] = []): string {
   const all: string[] = [];
-  if (!f.types.image) all.push(`${EXT} in ${set([...VIDEO, "gif"])}`);
+  if (!f.types.image) all.push(`${EXT} in ${set([...VIDEO, "gif", ...ARCHIVE])}`);
   if (!f.types.video) all.push(`${EXT} not in ${set(VIDEO)}`);
   if (!f.types.gif) all.push(`${EXT} != 'gif'`);
+  if (f.types.archive === false) all.push(`${EXT} not in ${set(ARCHIVE)}`);
   if (f.extOff.length) all.push(`${EXT} not in ${set(f.extOff.map((e) => e.toLowerCase()))}`);
   if (f.minW) all.push(`(not ${get("width")} or int(${get("width")}) >= ${f.minW})`);
   if (f.minH) all.push(`(not ${get("height")} or int(${get("height")}) >= ${f.minH})`);
